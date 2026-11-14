@@ -461,6 +461,45 @@ mod tests {
         bad.extend_from_slice(&[0u8; 8]);
         assert!(parse_wav(&bad).is_err());
     }
+
+    #[test]
+    #[ignore = "requires original/*.pak reference assets"]
+    fn reference_visual_and_audio_thresholds() {
+        let orig_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("original");
+        let graph = load_pak_file(&orig_dir.join("graph.pak")).expect("original/graph.pak");
+        let sound = load_pak_file(&orig_dir.join("sound.pak")).expect("original/sound.pak");
+
+        let ref_bg = parse_bmp(&graph[0]).unwrap();
+        let proc_bg_bu = flip_td_to_bu(&generate_background(), 800, 600);
+        let m_bg = compare_images(&ref_bg.pixels, &proc_bg_bu, 800, 600, false);
+        assert!(m_bg.ssim >= 0.43, "background SSIM regressed: {}", m_bg.ssim);
+        assert!(m_bg.psnr >= 15.5, "background PSNR regressed: {}", m_bg.psnr);
+
+        let mut ref_logo = parse_bmp(&graph[89]).unwrap();
+        for p in &mut ref_logo.pixels {
+            let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+            if sum <= 0x14 {
+                *p = 0;
+            }
+        }
+        let proc_logo = generate_title_logo();
+        let m_logo = compare_images(&ref_logo.pixels, &proc_logo.pixels, 410, 230, true);
+        assert!(m_logo.iou >= 0.90, "title logo IoU regressed: {}", m_logo.iou);
+        assert!(m_logo.ssim >= 0.50, "title logo SSIM regressed: {}", m_logo.ssim);
+
+        let ref_end = parse_bmp(&graph[90]).unwrap();
+        let proc_end = generate_ending_splash();
+        let m_end = compare_images(&ref_end.pixels, &proc_end.pixels, 400, 300, false);
+        assert!(m_end.ssim >= 0.75, "ending splash SSIM regressed: {}", m_end.ssim);
+        assert!(m_end.psnr >= 18.8, "ending splash PSNR regressed: {}", m_end.psnr);
+
+        let ref_w = parse_wav(&sound[0]).unwrap();
+        let proc_w = parse_wav(&generate_whistle_wav()).unwrap();
+        assert_eq!(ref_w.samples.len(), proc_w.samples.len());
+        let ref_h = parse_wav(&sound[1]).unwrap();
+        let proc_h = parse_wav(&generate_hit_wav()).unwrap();
+        assert_eq!(ref_h.samples.len(), proc_h.samples.len());
+    }
 }
 
 fn main() {

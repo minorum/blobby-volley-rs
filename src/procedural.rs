@@ -467,7 +467,7 @@ pub fn generate_background() -> Vec<u32> {
     let mut buf = vec![0u32; W * H];
 
     let shoreline = |x: f32| -> f32 {
-        338.0 - 19.0 * (x / 520.0).clamp(0.0, 1.0)
+        344.0 - 16.0 * (x / 620.0).clamp(0.0, 1.0)
             + 3.0 * (x * 0.014).sin()
             + 1.5 * (x * 0.037).cos()
     };
@@ -479,37 +479,39 @@ pub fn generate_background() -> Vec<u32> {
             let xf = x as f32;
             let sh_y = shoreline(xf);
             let col = if yf < 285.0 {
-                // Deep cobalt sky with wispy clouds weighted toward right & horizon
+                // Deep cobalt sky with wispy clouds weighted toward horizon & right
                 let t = yf / 285.0;
                 let cloud = fbm(xf * 0.007 + 2.1, yf * 0.022 + 0.4, 4);
-                let region = ((xf / 800.0) * 0.55 + t * 0.45).clamp(0.2, 1.0);
+                let region = ((xf / 800.0) * 0.40 + t * 0.60).clamp(0.05, 1.0)
+                    * ((yf - 25.0) / 80.0).clamp(0.0, 1.0);
                 let wisp = ((cloud - 0.50) * 2.6 * region).clamp(0.0, 1.0);
-                let r = 20.0 + t * 44.0 + wisp * 108.0;
-                let g = 60.0 + t * 50.0 + wisp * 96.0;
-                let b = 208.0 - t * 20.0 + wisp * 34.0;
+                let r = 23.0 + t * 56.0 + wisp * 102.0;
+                let g = 66.0 + t * 48.0 + wisp * 92.0;
+                let b = 227.0 + t * 5.0 + wisp * 24.0;
                 rgb(r, g, b)
             } else if yf < sh_y {
-                // Ocean with horizon darkening and horizontal wave ripples
+                // Ocean with crisp 1px horizon and bright cobalt water
                 let depth = ((yf - 285.0) / (sh_y - 285.0).max(1.0)).clamp(0.0, 1.0);
                 let ripple = fbm(xf * 0.055, yf * 0.42, 3);
                 let glint = if ripple > 0.72 && depth > 0.25 {
-                    (ripple - 0.72) * 260.0
+                    (ripple - 0.72) * 220.0
                 } else {
                     0.0
                 };
-                let horiz = if yf < 289.0 { 0.74 } else { 1.0 };
-                let r = (50.0 + depth * 26.0 + (ripple - 0.5) * 40.0 + glint) * horiz;
-                let g = (76.0 + depth * 32.0 + (ripple - 0.5) * 46.0 + glint) * horiz;
-                let b = (212.0 + depth * 12.0 + (ripple - 0.5) * 18.0 + glint * 0.4) * horiz;
+                let horiz = if yf < 286.0 { 0.88 } else { 1.0 };
+                let surf = if depth > 0.82 { (depth - 0.82) / 0.18 } else { 0.0 };
+                let r = (84.0 + depth * 18.0 + surf * 42.0 + (ripple - 0.5) * 30.0 + glint) * horiz;
+                let g = (106.0 + depth * 18.0 + surf * 36.0 + (ripple - 0.5) * 34.0 + glint) * horiz;
+                let b = (244.0 + depth * 4.0 - surf * 48.0 + (ripple - 0.5) * 14.0 + glint * 0.4) * horiz;
                 rgb(r, g, b)
             } else {
                 // Sandy beach with subtle shading and grain
                 let sand_t = ((yf - sh_y) / (600.0 - sh_y)).clamp(0.0, 1.0);
                 let grain = (hash2(x as i32, y as i32) - 0.5) * 10.0;
                 let dune = (fbm(xf * 0.006, yf * 0.012, 3) - 0.5) * 12.0;
-                let r = 166.0 + sand_t * 14.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
-                let g = 152.0 + sand_t * 12.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
-                let b = 82.0 + sand_t * 6.0 + grain * 0.7 + dune * 0.5;
+                let r = 171.0 + sand_t * 14.0 + grain + dune - (1.0 - xf / 800.0) * 14.0;
+                let g = 159.0 + sand_t * 12.0 + grain + dune - (1.0 - xf / 800.0) * 14.0;
+                let b = 84.0 + sand_t * 6.0 + grain * 0.7 + dune * 0.5;
                 rgb(r, g, b)
             };
             buf[y * W + x] = col;
@@ -726,12 +728,12 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
         if idx <= 50 {
             // Decoded above from embedded BV2 BMPs.
         } else if idx == 51 || idx == 52 {
-            // Downsample 148x101 blobby_base[0] (bounds x=41..106, y=12..101 -> ~65x89) into 24x24
+            // Downsample 148x101 blobby_base[0] into 24x24 (bounds x=3..20, y=0..23)
             for by in 0..H {
-                let sy = ((by as f32 + 0.5) / H as f32 * 94.0) as usize;
+                let sy = ((by as f32 + 0.5) / H as f32 * 86.0) as usize;
                 let src_y = sy.min(blobby_base0.height - 1);
                 for x in 0..W {
-                    let sx = 35 + ((x as f32 + 0.5) / W as f32 * 78.0) as usize;
+                    let sx = 33 + ((x as f32 + 0.5) / W as f32 * 82.0) as usize;
                     let p = blobby_base0.pixels[src_y * blobby_base0.width + sx.min(blobby_base0.width - 1)];
                     let sum = (p & 0xFF) + ((p >> 8) & 0xFF) + ((p >> 16) & 0xFF);
                     if sum >= 0x28 {
@@ -932,7 +934,7 @@ pub fn generate_title_logo() -> Sprite {
                 continue;
             }
 
-            if d > 17.8 {
+            if d > 18.7 {
                 continue;
             }
             let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 16.0;
@@ -940,14 +942,14 @@ pub fn generate_title_logo() -> Sprite {
 
             let rim = ((4.5 - d) / 1.9).clamp(0.0, 1.0);
             let hi = ((2.6 - d) / 2.0).clamp(0.0, 1.0) * (speckle.max(0.0) * 1.4);
-            let gr = (15.0 + rim * 60.0 + hi + speckle * 0.5).clamp(0.0, 255.0);
-            let gg = (105.0 + rim * 135.0 + hi * 0.8 + speckle).clamp(0.0, 255.0);
-            let gb = (12.0 + rim * 38.0 + hi * 0.7 + speckle * 0.4).clamp(0.0, 255.0);
+            let gr = (34.0 + rim * 52.0 + hi + speckle * 0.5).clamp(0.0, 255.0);
+            let gg = (122.0 + rim * 94.0 + hi * 0.8 + speckle).clamp(0.0, 255.0);
+            let gb = (34.0 + rim * 50.0 + hi * 0.7 + speckle * 0.4).clamp(0.0, 255.0);
 
-            let t = ((17.8 - d) / 13.3).clamp(0.0, 1.0);
-            let br = (35.0 + t * 55.0 + bump * 0.6 + speckle * 0.7).clamp(0.0, 255.0);
-            let bg = (45.0 + t * 65.0 + bump * 0.7 + speckle * 0.7).clamp(0.0, 255.0);
-            let bb = (170.0 + t * 85.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
+            let t = ((18.7 - d) / 14.2).clamp(0.0, 1.0);
+            let br = (52.0 + t * 56.0 + bump * 0.6 + speckle * 0.7).clamp(0.0, 255.0);
+            let bg = (46.0 + t * 64.0 + bump * 0.7 + speckle * 0.7).clamp(0.0, 255.0);
+            let bb = (185.0 + t * 70.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
 
             // Smooth teal/cyan transition between inner green letter and outer blue bubble
             let blend = ((d - 3.9) / 1.2).clamp(0.0, 1.0);
@@ -956,7 +958,7 @@ pub fn generate_title_logo() -> Sprite {
             let mut b = gb * (1.0 - blend) + bb * blend;
 
             // Desaturated blue-gray outer rim matching BV1.8's sum >= 142 colorkey contract
-            let outer = ((d - 16.5) / 1.3).clamp(0.0, 1.0);
+            let outer = ((d - 17.4) / 1.3).clamp(0.0, 1.0);
             r = r * (1.0 - outer) + (54.0 + speckle * 0.4) * outer;
             g = g * (1.0 - outer) + (58.0 + speckle * 0.4) * outer;
             b = b * (1.0 - outer) + (82.0 + speckle * 0.5) * outer;
@@ -1159,7 +1161,7 @@ pub fn generate_ending_splash() -> Sprite {
             }
             let xf = x as f32;
             // Smooth washed-out beach backdrop (left cliff/sand warm shadow, bright central sky, right 3 palm crowns)
-            let cliff = (1.0 - ((xf - 108.0) / 52.0).clamp(0.0, 1.0)) * 20.0;
+            let cliff = (1.0 - ((xf - 108.0) / 52.0).clamp(0.0, 1.0)) * 15.0;
             let right_palms = {
                 let mut p = 0.0_f32;
                 for &(px, py, pr) in &[(288.0_f32, 106.0_f32, 34.0_f32), (325.0, 90.0, 38.0), (368.0, 100.0, 34.0)] {
@@ -1169,26 +1171,20 @@ pub fn generate_ending_splash() -> Sprite {
                     if d < pr {
                         let ang = dy.atan2(dx);
                         let frond = 0.55 + 0.45 * (ang * 7.0).cos().abs();
-                        p = p.max((1.0 - d / pr) * frond * 14.0);
+                        p = p.max((1.0 - d / pr) * frond * 12.0);
                     }
                 }
                 p
             };
-            let sand_wash = if yf > 175.0 {
-                ((yf - 175.0) / 125.0).clamp(0.0, 1.0) * 6.0
-            } else {
-                0.0
-            };
-            let base = 224.0 - cliff - right_palms - sand_wash;
+            let base = 236.0 - cliff - right_palms;
 
             // Coherent rotated halftone screen matching graph.pak entry 90
-            let v1 = (TAU * (0.269 * xf - 0.093 * yf) + 1.7433).cos();
-            let v2 = (TAU * (0.087 * xf + 0.276 * yf) + 3.0886).cos();
-            let screen = (20.0 * v1 + 16.0 * v2).min(14.0);
+            let v1 = (TAU * (0.26855 * xf - 0.09277 * yf) + 2.2906).cos();
+            let v2 = (TAU * (0.08691 * xf + 0.28711 * yf) - 1.4885).cos();
+            let screen = (18.0 * v1 + 16.0 * v2).min(10.0);
 
-            let lum = (base + screen).clamp(0.0, 238.0);
-            let warm = if xf < 115.0 { 3.0 } else { 0.0 };
-            pixels[by * W + x] = rgb(lum + warm * 0.8, lum, lum - warm * 0.5);
+            let lum = (base + screen).clamp(8.0, 246.0);
+            pixels[by * W + x] = rgb(lum, lum - 1.5, lum - 2.2);
         }
     }
 
@@ -1310,12 +1306,12 @@ pub fn generate_hit_wav() -> Vec<u8> {
     const HIT_START: f32 = 46.0 / SR as f32;
     // Fitted modal table (freq Hz, decay s^-1, amplitude, phase rad) from sound_01.wav
     const MODES: [(f32, f32, f32, f32); 9] = [
-        (105.0, 48.0, 29.71, 2.284),
-        (190.0, 75.0, 17.43, -2.053),
-        (318.0, 95.0, 10.43, 2.745),
-        (565.0, 120.0, 9.63, -2.141),
-        (1470.0, 180.0, 11.53, 0.102),
-        (1810.0, 210.0, 14.49, -1.525),
+        (105.0, 48.0, 38.0, 2.284),
+        (190.0, 75.0, 22.0, -2.053),
+        (318.0, 95.0, 13.0, 2.745),
+        (565.0, 120.0, 12.0, -2.141),
+        (1470.0, 180.0, 14.5, 0.102),
+        (1810.0, 210.0, 18.0, -1.525),
         (2164.0, 230.0, 49.73, 0.371),
         (2379.0, 240.0, 62.52, -2.743),
         (2660.0, 260.0, 37.91, 2.091),
@@ -1417,17 +1413,33 @@ mod tests {
     #[test]
     fn embedded_arimo_fonts_parse_and_shape_credit_lines() {
         let mut shape_ctx = swash::shape::ShapeContext::new();
-        for (label, bytes, sample) in [
-            ("Arimo Regular", ARIMO_REGULAR_TTF, "www.t-online.de"),
-            ("Arimo Italic", ARIMO_ITALIC_TTF, "Blobby Volley"),
-        ] {
+        let credit_lines: &[(&str, &[u8], f32, f32, &str)] = &[
+            ("Arimo Italic", ARIMO_ITALIC_TTF, 38.0, 450.0, "Blobby Volley"),
+            ("Arimo Italic", ARIMO_ITALIC_TTF, 30.0, 550.0, "programmiert von"),
+            ("Arimo Italic", ARIMO_ITALIC_TTF, 31.0, 450.0, "Daniel Skoraszewsky"),
+            ("Arimo Italic", ARIMO_ITALIC_TTF, 30.0, 450.0, "Grafik von"),
+            ("Arimo Italic", ARIMO_ITALIC_TTF, 31.0, 500.0, "Silvio Mummert"),
+            ("Arimo Regular", ARIMO_REGULAR_TTF, 15.0, 600.0, "www.t-online.de/home/skoraszewsky/"),
+            ("Arimo Regular", ARIMO_REGULAR_TTF, 15.0, 600.0, "www.t-online.de/home/mummertathome/"),
+        ];
+        for &(label, bytes, px_size, weight, text) in credit_lines {
             let font = swash::FontRef::from_index(bytes, 0)
                 .unwrap_or_else(|| panic!("{label} failed to parse"));
-            let mut shaper = shape_ctx.builder(font).size(24.0).build();
-            shaper.add_str(sample);
+            let mut shaper = shape_ctx
+                .builder(font)
+                .size(px_size)
+                .variations(&[("wght", weight)])
+                .build();
+            shaper.add_str(text);
             let mut glyph_count = 0usize;
-            shaper.shape_with(|cluster| glyph_count += cluster.glyphs.len());
-            assert!(glyph_count >= sample.len(), "{label} shaped too few glyphs: {glyph_count}");
+            let mut advance = 0.0_f32;
+            shaper.shape_with(|cluster| {
+                glyph_count += cluster.glyphs.len();
+                for g in cluster.glyphs {
+                    advance += g.advance;
+                }
+            });
+            assert!(glyph_count > 0 && advance > 0.0, "{label} failed to shape '{text}'");
         }
     }
 }
