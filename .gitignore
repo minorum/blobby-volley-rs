@@ -3,3 +3,4 @@ original/
 blobby.zip
 bv_settings.txt
 *.bmp
+!assets/bv2_font/*.bmp
