@@ -1040,10 +1040,8 @@ fn draw_arimo_line_into(
     target_w: usize,
     text: &str,
 ) {
-    let font = match swash::FontRef::from_index(font_bytes, 0) {
-        Some(f) => f,
-        None => return,
-    };
+    let font = swash::FontRef::from_index(font_bytes, 0)
+        .expect("embedded Arimo font must be valid");
     let mut shaper = shape_ctx
         .builder(font)
         .size(px_size)
@@ -1413,6 +1411,23 @@ mod tests {
                 }
             }
             assert!(dark_cnt > 500, "missing text ink in band {y0}..={y1}: {dark_cnt}");
+        }
+    }
+
+    #[test]
+    fn embedded_arimo_fonts_parse_and_shape_credit_lines() {
+        let mut shape_ctx = swash::shape::ShapeContext::new();
+        for (label, bytes, sample) in [
+            ("Arimo Regular", ARIMO_REGULAR_TTF, "www.t-online.de"),
+            ("Arimo Italic", ARIMO_ITALIC_TTF, "Blobby Volley"),
+        ] {
+            let font = swash::FontRef::from_index(bytes, 0)
+                .unwrap_or_else(|| panic!("{label} failed to parse"));
+            let mut shaper = shape_ctx.builder(font).size(24.0).build();
+            shaper.add_str(sample);
+            let mut glyph_count = 0usize;
+            shaper.shape_with(|cluster| glyph_count += cluster.glyphs.len());
+            assert!(glyph_count >= sample.len(), "{label} shaped too few glyphs: {glyph_count}");
         }
     }
 }
