@@ -837,8 +837,38 @@ fn main() {
         "  logo ball ROI: fg_MAE={:5.2} (ROI RGB error); neutral_in_roi (non-green/non-blue inside ref ball ROI, not full-ball silhouette): fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
         m_logo_w.fg_mae, m_logo_wa.fg_mae, m_logo_wa.iou, m_logo_wa.boundary_f1
     );
+    let mut other_tp = 0usize;
+    let mut other_fp = 0usize;
+    let mut other_fn = 0usize;
+    let mut ot_ppm = format!("P6\n410 230\n255\n").into_bytes();
+    for by in (0..230).rev() {
+        for x in 0..410 {
+            let i = by * 410 + x;
+            let r_on = ref_other_seg[i] != 0;
+            let p_on = proc_other_seg[i] != 0;
+            let (r, g, b) = match (r_on, p_on) {
+                (true, true) => {
+                    other_tp += 1;
+                    (40, 220, 40)
+                }
+                (false, true) => {
+                    other_fp += 1;
+                    (230, 50, 50)
+                }
+                (true, false) => {
+                    other_fn += 1;
+                    (50, 90, 230)
+                }
+                (false, false) => (0, 0, 0),
+            };
+            ot_ppm.push(r);
+            ot_ppm.push(g);
+            ot_ppm.push(b);
+        }
+    }
+    let _ = fs::write(out_dir.join("title_logo_other_overlay.ppm"), ot_ppm);
     println!(
-        "  logo other:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4} (ref_px={ref_other_px}, proc_px={proc_other_px})",
+        "  logo other:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4} (ref_px={ref_other_px}, proc_px={proc_other_px}, tp={other_tp}, fp={other_fp}, fn={other_fn})",
         m_logo_o.fg_mae, m_logo_o.iou, m_logo_o.boundary_f1
     );
 

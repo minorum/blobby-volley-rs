@@ -483,33 +483,33 @@ pub fn generate_background() -> Vec<u32> {
                 let t = yf / 285.0;
                 let cloud = fbm(xf * 0.007 + 2.1, yf * 0.022 + 0.4, 4);
                 let region = ((xf / 800.0) * 0.55 + t * 0.45).clamp(0.2, 1.0);
-                let wisp = ((cloud - 0.52) * 2.5 * region).clamp(0.0, 1.0);
-                let r = 24.0 + t * 64.0 + wisp * 95.0;
-                let g = 64.0 + t * 58.0 + wisp * 88.0;
-                let b = 224.0 + t * 10.0 + wisp * 18.0;
+                let wisp = ((cloud - 0.50) * 2.6 * region).clamp(0.0, 1.0);
+                let r = 20.0 + t * 44.0 + wisp * 108.0;
+                let g = 60.0 + t * 50.0 + wisp * 96.0;
+                let b = 208.0 - t * 20.0 + wisp * 34.0;
                 rgb(r, g, b)
             } else if yf < sh_y {
                 // Ocean with horizon darkening and horizontal wave ripples
                 let depth = ((yf - 285.0) / (sh_y - 285.0).max(1.0)).clamp(0.0, 1.0);
                 let ripple = fbm(xf * 0.055, yf * 0.42, 3);
                 let glint = if ripple > 0.72 && depth > 0.25 {
-                    (ripple - 0.72) * 290.0
+                    (ripple - 0.72) * 260.0
                 } else {
                     0.0
                 };
-                let horiz = if yf < 289.0 { 0.72 } else { 1.0 };
-                let r = (66.0 + depth * 32.0 + (ripple - 0.5) * 44.0 + glint) * horiz;
-                let g = (94.0 + depth * 38.0 + (ripple - 0.5) * 52.0 + glint) * horiz;
-                let b = (238.0 + depth * 14.0 + (ripple - 0.5) * 16.0 + glint * 0.4) * horiz;
+                let horiz = if yf < 289.0 { 0.74 } else { 1.0 };
+                let r = (50.0 + depth * 26.0 + (ripple - 0.5) * 40.0 + glint) * horiz;
+                let g = (76.0 + depth * 32.0 + (ripple - 0.5) * 46.0 + glint) * horiz;
+                let b = (212.0 + depth * 12.0 + (ripple - 0.5) * 18.0 + glint * 0.4) * horiz;
                 rgb(r, g, b)
             } else {
                 // Sandy beach with subtle shading and grain
                 let sand_t = ((yf - sh_y) / (600.0 - sh_y)).clamp(0.0, 1.0);
-                let grain = (hash2(x as i32, y as i32) - 0.5) * 12.0;
-                let dune = (fbm(xf * 0.006, yf * 0.012, 3) - 0.5) * 14.0;
-                let r = 174.0 + sand_t * 14.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
-                let g = 160.0 + sand_t * 12.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
-                let b = 90.0 + sand_t * 8.0 + grain * 0.7 + dune * 0.6;
+                let grain = (hash2(x as i32, y as i32) - 0.5) * 10.0;
+                let dune = (fbm(xf * 0.006, yf * 0.012, 3) - 0.5) * 12.0;
+                let r = 166.0 + sand_t * 14.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
+                let g = 152.0 + sand_t * 12.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
+                let b = 82.0 + sand_t * 6.0 + grain * 0.7 + dune * 0.5;
                 rgb(r, g, b)
             };
             buf[y * W + x] = col;
@@ -543,8 +543,8 @@ pub fn generate_background() -> Vec<u32> {
     }
 
     // 3. Palm shadows on sand
-    draw_palm_shadow(&mut buf, W, H, 120.0, 382.0, 145.0, 32.0);
-    draw_palm_shadow(&mut buf, W, H, 665.0, 360.0, 115.0, 26.0);
+    draw_palm_shadow(&mut buf, W, H, 105.0, 386.0, 155.0, 34.0);
+    draw_palm_shadow(&mut buf, W, H, 605.0, 356.0, 120.0, 26.0);
 
     // 4. Palm trees (2 left, 3 right)
     draw_palm_tree(&mut buf, W, H, 62.0, 385.0, 46.0, 225.0, 32.0, 78.0, 7.0, 3.0, 74.0, 0.2);
@@ -932,10 +932,10 @@ pub fn generate_title_logo() -> Sprite {
                 continue;
             }
 
-            if d > 18.0 {
+            if d > 17.8 {
                 continue;
             }
-            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 14.0;
+            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 16.0;
             let bump = (fbm(px * 0.14, py * 0.14, 2) - 0.5) * 28.0;
 
             let rim = ((4.5 - d) / 1.9).clamp(0.0, 1.0);
@@ -951,11 +951,15 @@ pub fn generate_title_logo() -> Sprite {
 
             // Smooth teal/cyan transition between inner green letter and outer blue bubble
             let blend = ((d - 3.9) / 1.2).clamp(0.0, 1.0);
-            // Outer anti-aliased edge falloff into dark-blue/desaturated rim
-            let edge = ((18.0 - d) / 1.2).clamp(0.0, 1.0);
-            let r = (gr * (1.0 - blend) + br * blend) * (0.28 + 0.72 * edge);
-            let g = (gg * (1.0 - blend) + bg * blend) * (0.28 + 0.72 * edge);
-            let b = (gb * (1.0 - blend) + bb * blend) * (0.34 + 0.66 * edge);
+            let mut r = gr * (1.0 - blend) + br * blend;
+            let mut g = gg * (1.0 - blend) + bg * blend;
+            let mut b = gb * (1.0 - blend) + bb * blend;
+
+            // Desaturated blue-gray outer rim matching BV1.8's sum >= 142 colorkey contract
+            let outer = ((d - 16.5) / 1.3).clamp(0.0, 1.0);
+            r = r * (1.0 - outer) + (54.0 + speckle * 0.4) * outer;
+            g = g * (1.0 - outer) + (58.0 + speckle * 0.4) * outer;
+            b = b * (1.0 - outer) + (82.0 + speckle * 0.5) * outer;
             pixels[by * W + x] = rgb(r, g, b);
         }
     }
@@ -1009,11 +1013,6 @@ fn ascii_strokes(ch: char) -> &'static [&'static [(f32, f32)]] {
     }
 }
 
-fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
-    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
 fn card_char_advance(ch: char) -> f32 {
     match ch {
         'i' | 'l' | '.' => 0.36,
@@ -1038,7 +1037,7 @@ fn draw_card_text(
 ) {
     let mut shadow_mask = vec![0.0_f32; w * h];
     let mut fg_mask = vec![0.0_f32; w * h];
-    let stroke_r = (cw * 0.085).max(0.75);
+    let stroke_r = (cw * 0.058).max(0.65);
     let mut cx = x0;
 
     for c in text.chars() {
@@ -1078,10 +1077,10 @@ fn draw_card_text(
 
     for i in 0..(w * h) {
         if shadow_mask[i] > 0.0 {
-            darken_pixel(&mut buf[i], 1.0 - shadow_mask[i]);
+            darken_pixel(&mut buf[i], 1.0 - shadow_mask[i] * 0.85);
         }
         if fg_mask[i] > 0.0 {
-            blend_pixel(&mut buf[i], 28.0, 28.0, 32.0, fg_mask[i]);
+            blend_pixel(&mut buf[i], 58.0, 58.0, 62.0, fg_mask[i]);
         }
     }
 }
@@ -1090,6 +1089,7 @@ fn draw_card_text(
 pub fn generate_ending_splash() -> Sprite {
     const W: usize = 400;
     const H: usize = 300;
+    let bg = generate_background();
     let mut pixels = vec![0u32; W * H];
 
     for by in 0..H {
@@ -1099,35 +1099,36 @@ pub fn generate_ending_splash() -> Sprite {
                 pixels[by * W + x] = rgb(12.0, 13.0, 13.0);
                 continue;
             }
-            let weave = (((x + y) % 4) as f32 - 1.5) * 2.2
-                + (((x as i32 - y as i32).rem_euclid(4)) as f32 - 1.5) * 1.8;
-            // Subtle faded watermark of the beach sand/pole on the left and palm fronds on the right
-            let sand_edge = smoothstep(235.0, 175.0, x as f32 + (y as f32) * 0.25);
-            let palm_hint = if x > 240 && y < 220 {
-                let dx = (x as f32 - 330.0) / 80.0;
-                let dy = (y as f32 - 90.0) / 80.0;
-                let ang = dy.atan2(dx);
-                let fronds = ((ang * 5.0).cos()).max(0.0);
-                fronds * smoothstep(1.2, 0.2, (dx * dx + dy * dy).sqrt()) * 14.0
-            } else {
-                0.0
-            };
-            let grain = (hash2(x as i32, y as i32) - 0.5) * 5.0;
-            let base = 236.0 - sand_edge * 16.0 - palm_hint + weave + grain;
-            let r = (base + 1.0).clamp(0.0, 255.0);
-            let g = base.clamp(0.0, 255.0);
-            let b = (base + 2.0 - sand_edge * 3.0).clamp(0.0, 255.0);
+            // Washed-out 2x downsampled beach background with fine diagonal canvas weave
+            let bg_p = bg[(y * 2) * 800 + (x * 2)];
+            let br = ((bg_p >> 16) & 0xFF) as f32;
+            let bg_c = ((bg_p >> 8) & 0xFF) as f32;
+            let bb = (bg_p & 0xFF) as f32;
+            let lum = 0.299 * br + 0.587 * bg_c + 0.114 * bb;
+            let wash_r = 248.0 * 0.74 + (lum * 0.65 + br * 0.35) * 0.26;
+            let wash_g = 248.0 * 0.74 + (lum * 0.65 + bg_c * 0.35) * 0.26;
+            let wash_b = 249.0 * 0.74 + (lum * 0.65 + bb * 0.35) * 0.26;
+            let weave_dot =
+                if (x + y) % 4 == 0 && (x as i32 - y as i32).rem_euclid(4) == 0 {
+                    -8.0
+                } else {
+                    2.0
+                };
+            let grain = (hash2(x as i32, y as i32) - 0.5) * 4.0;
+            let r = (wash_r + weave_dot + grain).clamp(0.0, 255.0);
+            let g = (wash_g + weave_dot + grain).clamp(0.0, 255.0);
+            let b = (wash_b + weave_dot + grain).clamp(0.0, 255.0);
             pixels[by * W + x] = rgb(r, g, b);
         }
     }
 
-    draw_card_text(&mut pixels, W, H, 14.0, 12.0, 21.0, 31.0, 0.28, "Blobby Volley");
-    draw_card_text(&mut pixels, W, H, 29.0, 92.0, 18.0, 25.0, 0.26, "programmiert von");
-    draw_card_text(&mut pixels, W, H, 94.0, 132.0, 18.0, 24.0, 0.26, "Daniel Skoraszewsky");
-    draw_card_text(&mut pixels, W, H, 29.0, 170.0, 18.0, 24.0, 0.26, "Grafik von");
-    draw_card_text(&mut pixels, W, H, 102.0, 208.0, 18.0, 24.0, 0.26, "Silvio Mummert");
-    draw_card_text(&mut pixels, W, H, 24.0, 263.0, 10.5, 11.5, 0.04, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text(&mut pixels, W, H, 24.0, 281.0, 10.5, 11.5, 0.04, "www.t-online.de/home/mummertathome/");
+    draw_card_text(&mut pixels, W, H, 14.0, 14.0, 18.0, 26.0, 0.26, "Blobby Volley");
+    draw_card_text(&mut pixels, W, H, 29.0, 96.0, 15.5, 20.0, 0.24, "programmiert von");
+    draw_card_text(&mut pixels, W, H, 78.0, 133.0, 14.5, 21.0, 0.24, "Daniel Skoraszewsky");
+    draw_card_text(&mut pixels, W, H, 29.0, 170.0, 15.5, 20.0, 0.24, "Grafik von");
+    draw_card_text(&mut pixels, W, H, 88.0, 208.0, 15.0, 21.0, 0.24, "Silvio Mummert");
+    draw_card_text(&mut pixels, W, H, 24.0, 264.0, 9.8, 10.5, 0.04, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text(&mut pixels, W, H, 24.0, 282.0, 9.8, 10.5, 0.04, "www.t-online.de/home/mummertathome/");
 
     Sprite {
         width: W,
