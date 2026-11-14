@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::pak::{load_pak_file, parse_bmp, BmpImage};
+use crate::procedural::generate_ball_frames;
 
 pub const BLOBBY_COLORS: [u32; 8] = [
     0xFF0000, // 0: Red
@@ -141,20 +142,8 @@ impl GameAssets {
         }
         let bg_dark: Vec<u32> = bg.iter().map(|&p| (p & 0x00F8F8F8) >> 3).collect();
 
-        // Ball frames (1..=16)
-        let mut ball_frames = Vec::with_capacity(16);
-        for entry in &graph[1..=16] {
-            let mut img = parse_bmp(entry)?;
-            for p in &mut img.pixels {
-                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-                if sum < 0xB4 {
-                    *p = 0;
-                } else if *p == 0 {
-                    *p = 1;
-                }
-            }
-            ball_frames.push(img);
-        }
+        // Ball frames (procedural, 16 frames of 64x64)
+        let ball_frames = generate_ball_frames();
 
         // Blobby base frames (17..=21)
         let mut blobby_base = Vec::with_capacity(5);

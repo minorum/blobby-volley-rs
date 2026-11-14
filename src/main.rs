@@ -1,17 +1,8 @@
-mod app;
-mod assets;
-mod audio;
-mod net;
-mod pak;
-mod render;
-mod settings;
-mod sim;
-
 use minifb::{Window, WindowOptions};
 
-use crate::app::App;
-use crate::assets::{find_asset_dir, GameAssets};
-use crate::render::{HEIGHT, WIDTH};
+use blobby_volley_rs::app::App;
+use blobby_volley_rs::assets::{find_asset_dir, GameAssets};
+use blobby_volley_rs::render::{HEIGHT, WIDTH};
 
 fn main() {
     let asset_dir = find_asset_dir();
