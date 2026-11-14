@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::pak::{load_pak_file, parse_bmp, BmpImage};
 use crate::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
-    generate_blobby_shadows,
+    generate_blobby_shadows, generate_font_glyphs,
 };
 
 pub const BLOBBY_COLORS: [u32; 8] = [
@@ -134,18 +134,8 @@ impl GameAssets {
         // Blobby base frames (procedural, 5 frames of 148x101)
         let blobby_base = generate_blobby_frames();
 
-        // Font glyphs (22..=76)
-        let mut font_glyphs = Vec::with_capacity(55);
-        for entry in &graph[22..=76] {
-            let mut img = parse_bmp(entry)?;
-            for p in &mut img.pixels {
-                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-                if sum < 0x28 {
-                    *p = 0;
-                }
-            }
-            font_glyphs.push(img);
-        }
+        // Font glyphs (procedural, 55 glyphs of 24x24)
+        let font_glyphs = generate_font_glyphs(&blobby_base[0]);
         let font_icon_base = font_glyphs[0x33].clone();
 
         // Blobby shadows (procedural, 10 frames of 129x25)

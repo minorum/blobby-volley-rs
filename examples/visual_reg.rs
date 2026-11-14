@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use blobby_volley_rs::pak::{load_pak_file, parse_bmp, BmpImage};
 use blobby_volley_rs::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
-    generate_blobby_shadows,
+    generate_blobby_shadows, generate_font_glyphs,
 };
 
 struct Metrics {
@@ -193,4 +193,43 @@ fn main() {
     let m_bg = compare_images(&ref_bg, &proc_bg);
     save_side_by_side(&out_dir.join("bg.ppm"), &ref_bg, &proc_bg);
     println!("Background: MAE={:.2}, PSNR={:.2} dB", m_bg.mae, m_bg.psnr);
+
+    // 5. Font glyphs (22..=76, 55 glyphs of 24x24)
+    let proc_font = generate_font_glyphs(&proc_blobby[0]);
+    let mut font_iou = 0.0;
+    let mut font_sheet_proc = BmpImage {
+        width: 24 * 11,
+        height: 24 * 5,
+        pixels: vec![0u32; 24 * 11 * 24 * 5],
+    };
+    let mut font_sheet_ref = BmpImage {
+        width: 24 * 11,
+        height: 24 * 5,
+        pixels: vec![0u32; 24 * 11 * 24 * 5],
+    };
+    for (k, proc_img) in proc_font.iter().enumerate() {
+        let mut ref_img = parse_bmp(&graph[22 + k]).unwrap();
+        for p in &mut ref_img.pixels {
+            let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+            if sum < 0x28 {
+                *p = 0;
+            }
+        }
+        font_iou += compare_images(&ref_img, proc_img).iou;
+        let gx = (k % 11) * 24;
+        let gy = 4 - (k / 11);
+        for y in 0..24 {
+            for x in 0..24 {
+                let dst_idx = (gy * 24 + y) * (24 * 11) + (gx + x);
+                font_sheet_ref.pixels[dst_idx] = ref_img.pixels[y * 24 + x];
+                font_sheet_proc.pixels[dst_idx] = proc_img.pixels[y * 24 + x];
+            }
+        }
+    }
+    save_side_by_side(
+        &out_dir.join("font_sheet.ppm"),
+        &font_sheet_ref,
+        &font_sheet_proc,
+    );
+    println!("Font (55 glyphs): mean mask IoU={:.4}", font_iou / 55.0);
 }
