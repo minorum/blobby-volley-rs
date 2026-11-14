@@ -88,16 +88,16 @@ pub fn generate_ball_frames() -> Vec<Sprite> {
 }
 
 #[inline]
-fn sd_ellipsoid(px: f32, py: f32, pz: f32, cx: f32, cy: f32, rx: f32, ry: f32, rz: f32) -> f32 {
-    let qx = (px - cx) / rx;
-    let qy = (py - cy) / ry;
-    let qz = pz / rz;
+fn sd_ellipsoid(p: [f32; 3], c: [f32; 3], r: [f32; 3]) -> f32 {
+    let qx = (p[0] - c[0]) / r[0];
+    let qy = (p[1] - c[1]) / r[1];
+    let qz = (p[2] - c[2]) / r[2];
     let k0 = (qx * qx + qy * qy + qz * qz).sqrt();
-    let k1 = ((qx / rx).powi(2) + (qy / ry).powi(2) + (qz / rz).powi(2)).sqrt();
+    let k1 = ((qx / r[0]).powi(2) + (qy / r[1]).powi(2) + (qz / r[2]).powi(2)).sqrt();
     if k1 > 1e-6 {
         k0 * (k0 - 1.0) / k1
     } else {
-        -rx.min(ry).min(rz)
+        -r[0].min(r[1]).min(r[2])
     }
 }
 
@@ -139,8 +139,16 @@ pub fn generate_blobby_frames() -> Vec<Sprite> {
         let sk = 15.0 - 5.5 * t;
 
         let sdf = |px: f32, py: f32, pz: f32| -> f32 {
-            let d1 = sd_ellipsoid(px, py, pz, CX, head_cy, head_rx, head_ry, head_rx);
-            let d2 = sd_ellipsoid(px, py, pz, CX, body_cy, body_rx, body_ry, body_rx);
+            let d1 = sd_ellipsoid(
+                [px, py, pz],
+                [CX, head_cy, 0.0],
+                [head_rx, head_ry, head_rx],
+            );
+            let d2 = sd_ellipsoid(
+                [px, py, pz],
+                [CX, body_cy, 0.0],
+                [body_rx, body_ry, body_rx],
+            );
             smin(d1, d2, sk)
         };
 
@@ -516,7 +524,7 @@ pub fn generate_background() -> Vec<u32> {
             170.0 + xf * 0.21 + (fbm(xf * 0.08, 1.0, 3) - 0.5) * 18.0
         } else if x < 208 {
             170.0 + 198.0 * 0.21 + (xf - 198.0) * 8.5
-        } else if x >= 224 && x <= 258 {
+        } else if (224..=258).contains(&x) {
             let d = ((xf - 241.0) / 17.0).abs();
             260.0 + d * d * 32.0 + (fbm(xf * 0.2, 2.0, 2) - 0.5) * 6.0
         } else {
@@ -725,8 +733,8 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
     let mut glyphs = Vec::with_capacity(55);
 
     for idx in 0..55 {
-        let mut pixels = if idx <= 50 {
-            decode_bv2_font_bmp(BV2_FONT_BMPS[idx])
+        let mut pixels = if let Some(&bmp) = BV2_FONT_BMPS.get(idx) {
+            decode_bv2_font_bmp(bmp)
         } else {
             vec![0u32; W * H]
         };
@@ -1254,7 +1262,8 @@ pub fn generate_ending_splash() -> Sprite {
     let mut shape_ctx = swash::shape::ShapeContext::new();
     let mut scale_ctx = swash::scale::ScaleContext::new();
 
-    let lines: &[(&[u8], f32, f32, isize, isize, usize, &str)] = &[
+    type CreditLine<'a> = (&'a [u8], f32, f32, isize, isize, usize, &'a str);
+    let lines: &[CreditLine<'_>] = &[
         (ARIMO_ITALIC_TTF, 38.0, 450.0, 13, 13, 216, "Blobby Volley"),
         (
             ARIMO_ITALIC_TTF,

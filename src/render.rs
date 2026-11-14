@@ -18,6 +18,12 @@ pub struct Framebuffer {
     pub pixels: Vec<u32>,
 }
 
+impl Default for Framebuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Framebuffer {
     pub fn new() -> Self {
         Self {
@@ -208,8 +214,7 @@ impl Framebuffer {
 
         let r = &m.rally;
         // Player shadows
-        for i in 0..2 {
-            let p = &r.players[i];
+        for (i, p) in r.players.iter().enumerate() {
             let sx = (p.x + ((p.y - 100) >> 2) + 24 - (i as i32) * 24) & !1;
             let sy = ((p.y - 100) >> 3) + 97;
             let frame = (p.anim_frame.clamp(0, 4) as usize) + i * 5;
@@ -281,8 +286,7 @@ impl Framebuffer {
         self.draw_sprite_bu(&assets.ball_frames[ball_frame], bx_px - 32, by_px - 32);
 
         // Players
-        for i in 0..2 {
-            let p = &r.players[i];
+        for (i, p) in r.players.iter().enumerate() {
             let frame = p.anim_frame.clamp(0, 4) as usize;
             self.draw_sprite_bu(&assets.blobby_colored[i][frame], p.x - 74, p.y);
         }

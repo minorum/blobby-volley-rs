@@ -266,11 +266,13 @@ mod tests {
     fn save_and_load_roundtrip() {
         let dir = std::env::temp_dir().join("blobby_volley_rs_settings_test");
         let _ = fs::create_dir_all(&dir);
-        let mut s = GameSettings::default();
-        s.language = Language::German;
-        s.sound_enabled = false;
-        s.player_names = ["Max".to_string(), "Moritz".to_string()];
-        s.player_colors = [2, 5];
+        let mut s = GameSettings {
+            language: Language::German,
+            sound_enabled: false,
+            player_names: ["Max".to_string(), "Moritz".to_string()],
+            player_colors: [2, 5],
+            ..Default::default()
+        };
         s.record_match([15, 12]);
         s.save_to_dir(&dir);
 
