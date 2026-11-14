@@ -10,9 +10,10 @@
   - Blobby Volley 1.8 glyph `50` (`'-'`) corresponds to `font52.bmp` in Blobby Volley 2 (while `font50.bmp` is `'_'` and `font51.bmp` is `' '`).
   - Blobby Volley 1.8 glyphs `51..=54` (P1/P2 Blobby player icons and up/down menu arrows) are not present in Blobby Volley 2 (`font53..58` were repurposed for `%`, `+`, `ì`, `¿`, eye, lock) and remain procedurally generated in `src/procedural.rs`.
 
-## Copyright & Licensing
+## Copyright, License & Distribution Terms
 - **Original Graphics Author**: **Silvio Mummert** (`mummertathome@t-online.de`), as credited in Blobby Volley 2's `AUTHORS` file.
-- **Repository License**: The `danielknobe/blobbyvolley2` repository distributes its source code and `data/gfx/` assets together under the **GNU General Public License, version 2 (GPL-2.0)** (`COPYING`), without a separate per-asset license file in `data/gfx/`.
-- **Licensing Obligations**:
-  - Do not assume these bitmaps are permissively licensed or public domain.
-  - Retaining and redistributing these BMPs (including compiled-in via `include_bytes!`) requires preserving Silvio Mummert's attribution and complying with GPL-2.0 terms (or obtaining separate permission from the graphics copyright holder if distributing under a non-GPL-compatible license).
+- **Combined Program License**: Because these 51 BMPs are compiled into the executable via `include_bytes!`, the combined program and font assets are distributed under the **GNU General Public License, version 2 (GPL-2.0)**, whose complete text is included in [`../../COPYING`](../../COPYING).
+- **Source & Binary Redistribution**:
+  - Any source or binary redistribution of `blobby-volley-rs` containing these assets must preserve Silvio Mummert's copyright attribution, retain this notice and [`../../COPYING`](../../COPYING), and comply with GPL-2.0 source-availability obligations.
+- **Upstream Asset Caveat**:
+  - The `danielknobe/blobbyvolley2` repository ships `data/gfx/` alongside its root GPL-2.0 `COPYING` without a separate per-file asset license grant. If distributing binaries outside GPL-2.0 or if downstream packagers require an explicit written grant from Silvio Mummert, obtain separate permission from the graphics author or replace these bitmaps.

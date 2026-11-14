@@ -728,10 +728,10 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
         } else if idx == 51 || idx == 52 {
             // Downsample 148x101 blobby_base[0] (bounds x=41..106, y=12..101 -> ~65x89) into 24x24
             for by in 0..H {
-                let sy = ((by as f32 + 0.5) / H as f32 * 90.0) as usize;
+                let sy = ((by as f32 + 0.5) / H as f32 * 94.0) as usize;
                 let src_y = sy.min(blobby_base0.height - 1);
                 for x in 0..W {
-                    let sx = 37 + ((x as f32 + 0.5) / W as f32 * 74.0) as usize;
+                    let sx = 35 + ((x as f32 + 0.5) / W as f32 * 78.0) as usize;
                     let p = blobby_base0.pixels[src_y * blobby_base0.width + sx.min(blobby_base0.width - 1)];
                     let sum = (p & 0xFF) + ((p >> 8) & 0xFF) + ((p >> 16) & 0xFF);
                     if sum >= 0x28 {
@@ -740,25 +740,56 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
                 }
             }
         } else {
-            // 53: Up arrow, 54: Down arrow (full-width 24x24 rainbow arrows)
+            // 53: Up arrow, 54: Down arrow (exact 24x24 silhouette: 12-row head + 10-row shaft)
             let is_up = idx == 53;
-            for by in 0..H {
-                let py = (H - 1 - by) as f32 + 0.5;
-                let y_dir = if is_up { py } else { 24.0 - py };
-                for x in 0..W {
-                    let px = x as f32 + 0.5;
-                    let dx = (px - 12.0).abs();
-                    let in_head = (1.5..=12.0).contains(&y_dir) && dx <= (y_dir - 1.5) * 1.12;
-                    let in_shaft = (12.0..=22.5).contains(&y_dir) && dx <= 5.5;
-                    if in_head || in_shaft {
-                        let t = py / 24.0;
-                        let (r, g, b) = if is_up {
-                            (255.0 * (1.0 - t * 0.6), 30.0 + 90.0 * (1.0 - t), 30.0 + 225.0 * t)
-                        } else {
-                            (200.0 * (1.0 - t), 40.0 + 210.0 * t, 255.0 * (1.0 - (t - 0.35).abs() * 1.4).max(0.15))
-                        };
-                        pixels[by * W + x] = rgb(r, g, b);
+            let stops: &[(f32, [f32; 3])] = if is_up {
+                &[
+                    (1.0, [252.0, 118.0, 119.0]),
+                    (6.0, [251.0, 44.0, 67.0]),
+                    (12.0, [193.0, 2.0, 110.0]),
+                    (17.0, [182.0, 11.0, 226.0]),
+                    (22.0, [78.0, 2.0, 159.0]),
+                ]
+            } else {
+                &[
+                    (1.0, [241.0, 82.0, 249.0]),
+                    (6.0, [227.0, 21.0, 232.0]),
+                    (12.0, [59.0, 141.0, 129.0]),
+                    (17.0, [52.0, 153.0, 64.0]),
+                    (22.0, [147.0, 8.0, 151.0]),
+                ]
+            };
+            let sample_stops = |y: f32| -> (f32, f32, f32) {
+                for w in stops.windows(2) {
+                    if y <= w[1].0 {
+                        let t = ((y - w[0].0) / (w[1].0 - w[0].0)).clamp(0.0, 1.0);
+                        return (
+                            w[0].1[0] + (w[1].1[0] - w[0].1[0]) * t,
+                            w[0].1[1] + (w[1].1[1] - w[0].1[1]) * t,
+                            w[0].1[2] + (w[1].1[2] - w[0].1[2]) * t,
+                        );
                     }
+                }
+                let last = stops[stops.len() - 1].1;
+                (last[0], last[1], last[2])
+            };
+            for by in 0..H {
+                let top_y = H - 1 - by;
+                let dir_y = if is_up { top_y } else { by };
+                let hw = if (1..=12).contains(&dir_y) {
+                    dir_y
+                } else if (13..=22).contains(&dir_y) {
+                    6
+                } else {
+                    0
+                };
+                if hw == 0 {
+                    continue;
+                }
+                let (r, g, b) = sample_stops(top_y as f32);
+                let col = rgb(r, g, b);
+                for x in (12 - hw)..(12 + hw) {
+                    pixels[by * W + x] = col;
                 }
             }
         }

@@ -580,6 +580,7 @@ fn main() {
     let proc_font = generate_font_glyphs(&proc_blobby[0]);
     let (mut f_mae, mut f_iou, mut f_bf1) = (0.0, 0.0, 0.0);
     let (mut bv2_mae, mut bv2_iou, mut bv2_bf1) = (0.0, 0.0, 0.0);
+    let mut extra_glyphs = Vec::new();
     for (k, proc_img) in proc_font.iter().enumerate() {
         let mut ref_img = parse_bmp(&graph[22 + k]).unwrap();
         for p in &mut ref_img.pixels {
@@ -596,6 +597,8 @@ fn main() {
             bv2_mae += m.fg_mae;
             bv2_iou += m.iou;
             bv2_bf1 += m.boundary_f1;
+        } else {
+            extra_glyphs.push((k, m));
         }
     }
     println!(
@@ -607,6 +610,12 @@ fn main() {
         bv2_iou / 51.0,
         bv2_bf1 / 51.0
     );
+    for (k, m) in extra_glyphs {
+        println!(
+            "  glyph [{k}]:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+            m.fg_mae, m.iou, m.boundary_f1
+        );
+    }
 
     // 6. Cursor, Title logo, Ending splash
     let ref_cursor = parse_bmp(&graph[88]).unwrap();
@@ -640,22 +649,43 @@ fn main() {
         let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
         if p != 0 && !(g > b + 20 && g > r + 10) && b > r + 20 && b > g + 10 { p } else { 0 }
     };
-    let is_ball_neutral = |p: u32| -> u32 {
-        if p != 0 && is_green_core(p) == 0 && is_blue_bubble(p) == 0 { p } else { 0 }
+    let segment_logo = |px_buf: &[u32]| -> (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) {
+        let n = px_buf.len();
+        let (mut gr, mut bl, mut ball, mut other) = (vec![0; n], vec![0; n], vec![0; n], vec![0; n]);
+        for by in 0..230usize {
+            let py = (229 - by) as f32 + 0.5;
+            for x in 0..410usize {
+                let i = by * 410 + x;
+                let p = px_buf[i];
+                if p == 0 {
+                    continue;
+                }
+                let px = x as f32 + 0.5;
+                let in_ball_disc = (px - 251.6).powi(2) + (py - 164.7).powi(2) <= 25.0 * 25.0;
+                if is_green_core(p) != 0 {
+                    gr[i] = p;
+                } else if is_blue_bubble(p) != 0 {
+                    bl[i] = p;
+                } else if in_ball_disc {
+                    ball[i] = p;
+                } else {
+                    other[i] = p;
+                }
+            }
+        }
+        (gr, bl, ball, other)
     };
-    let ref_green: Vec<u32> = ref_logo.pixels.iter().copied().map(is_green_core).collect();
-    let proc_green: Vec<u32> = proc_logo.pixels.iter().copied().map(is_green_core).collect();
+    let (ref_green, ref_blue, ref_ball_seg, ref_other_seg) = segment_logo(&ref_logo.pixels);
+    let (proc_green, proc_blue, proc_ball_seg, proc_other_seg) = segment_logo(&proc_logo.pixels);
     let m_logo_g = compare_images(&ref_green, &proc_green, 410, 230, true);
-    let ref_blue: Vec<u32> = ref_logo.pixels.iter().copied().map(is_blue_bubble).collect();
-    let proc_blue: Vec<u32> = proc_logo.pixels.iter().copied().map(is_blue_bubble).collect();
     let m_logo_b = compare_images(&ref_blue, &proc_blue, 410, 230, true);
-    let ref_ball_seg: Vec<u32> = ref_logo.pixels.iter().copied().map(is_ball_neutral).collect();
-    let proc_ball_seg: Vec<u32> = proc_logo.pixels.iter().copied().map(is_ball_neutral).collect();
     let m_logo_w = compare_images(&ref_ball_seg, &proc_ball_seg, 410, 230, true);
+    let m_logo_o = compare_images(&ref_other_seg, &proc_other_seg, 410, 230, true);
     for (i, &p) in ref_logo.pixels.iter().enumerate() {
         let cnt = usize::from(ref_green[i] != 0)
             + usize::from(ref_blue[i] != 0)
-            + usize::from(ref_ball_seg[i] != 0);
+            + usize::from(ref_ball_seg[i] != 0)
+            + usize::from(ref_other_seg[i] != 0);
         assert_eq!(cnt, usize::from(p != 0), "logo masks must partition fg");
     }
     // Export contour overlay (green = ref edge, red = proc edge, yellow = overlap)
@@ -694,8 +724,12 @@ fn main() {
         m_logo_b.fg_mae, m_logo_b.iou, m_logo_b.boundary_f1
     );
     println!(
-        "  logo neutral:  fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        "  logo ball:     fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
         m_logo_w.fg_mae, m_logo_w.iou, m_logo_w.boundary_f1
+    );
+    println!(
+        "  logo other:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        m_logo_o.fg_mae, m_logo_o.iou, m_logo_o.boundary_f1
     );
 
     let ref_end = parse_bmp(&graph[90]).unwrap();
