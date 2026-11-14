@@ -623,6 +623,28 @@ fn main() {
         "Title logo:      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4}",
         m_logo.fg_mae, m_logo.iou, m_logo.boundary_f1, m_logo.ssim
     );
+    let is_green_core = |p: u32| -> u32 {
+        let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
+        if p != 0 && g > b + 20 && g > r + 10 { p } else { 0 }
+    };
+    let is_blue_bubble = |p: u32| -> u32 {
+        let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
+        if p != 0 && !(g > b + 20 && g > r + 10) { p } else { 0 }
+    };
+    let ref_green: Vec<u32> = ref_logo.pixels.iter().copied().map(is_green_core).collect();
+    let proc_green: Vec<u32> = proc_logo.pixels.iter().copied().map(is_green_core).collect();
+    let m_logo_g = compare_images(&ref_green, &proc_green, 410, 230, true);
+    let ref_blue: Vec<u32> = ref_logo.pixels.iter().copied().map(is_blue_bubble).collect();
+    let proc_blue: Vec<u32> = proc_logo.pixels.iter().copied().map(is_blue_bubble).collect();
+    let m_logo_b = compare_images(&ref_blue, &proc_blue, 410, 230, true);
+    println!(
+        "  logo green:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        m_logo_g.fg_mae, m_logo_g.iou, m_logo_g.boundary_f1
+    );
+    println!(
+        "  logo blue:     fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        m_logo_b.fg_mae, m_logo_b.iou, m_logo_b.boundary_f1
+    );
 
     let ref_end = parse_bmp(&graph[90]).unwrap();
     let proc_end = generate_ending_splash();
