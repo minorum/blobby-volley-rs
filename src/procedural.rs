@@ -386,21 +386,21 @@ fn draw_palm_tree(
     }
 
     // Feathery palm fronds radiating from crown (tx, ty)
-    let num_fronds = 13;
+    let num_fronds = 18;
     for f in 0..num_fronds {
         let ang = (f as f32 / num_fronds as f32) * std::f32::consts::TAU + seed;
         let dir_x = ang.cos();
         let dir_y = ang.sin() * 0.72 - 0.16;
         let len = frond_len * (0.85 + 0.30 * ((f as f32 * 2.1 + seed).sin() * 0.5 + 0.5));
-        let droop = 28.0 + 22.0 * (1.0 - dir_y.abs());
+        let droop = 32.0 + 24.0 * (1.0 - dir_y.abs());
 
-        let spine_steps = 52;
+        let spine_steps = 58;
         for s in 2..=spine_steps {
             let t = s as f32 / spine_steps as f32;
             let sx = tx + dir_x * len * t;
             let sy = ty + dir_y * len * t + droop * t * t;
-            let leaf_len = (1.0 - (t - 0.35).abs() * 1.1).clamp(0.18, 1.0) * (len * 0.28);
-            let shade = if dir_y < 0.0 { 1.0 } else { 0.72 };
+            let leaf_len = (1.0 - (t - 0.35).abs() * 1.1).clamp(0.18, 1.0) * (len * 0.30);
+            let shade = if dir_y < 0.0 { 0.95 } else { 0.68 };
 
             draw_disc(
                 buf,
@@ -408,8 +408,8 @@ fn draw_palm_tree(
                 h,
                 sx,
                 sy,
-                1.3,
-                rgb(12.0 * shade, 72.0 * shade, 8.0),
+                1.4,
+                rgb(10.0 * shade, 58.0 * shade, 6.0),
             );
 
             // Leaflets on both sides of spine
@@ -417,18 +417,18 @@ fn draw_palm_tree(
             let perp_y = dir_x;
             for side in [-1.0_f32, 1.0_f32] {
                 let lx_dir = (perp_x * side * 0.80 + dir_x * 0.50) * leaf_len;
-                let ly_dir = (perp_y * side * 0.55 + dir_y * 0.35 + 0.48) * leaf_len;
-                let l_steps = 16;
+                let ly_dir = (perp_y * side * 0.55 + dir_y * 0.35 + 0.50) * leaf_len;
+                let l_steps = 20;
                 for ls in 1..=l_steps {
                     let lt = ls as f32 / l_steps as f32;
                     let px = sx + lx_dir * lt;
-                    let py = sy + ly_dir * lt + 3.5 * lt * lt;
+                    let py = sy + ly_dir * lt + 4.0 * lt * lt;
                     let ix = px.round() as i32;
                     let iy = py.round() as i32;
                     if (0..w as i32).contains(&ix) && (0..h as i32).contains(&iy) {
-                        let g = (52.0 + 96.0 * (1.0 - lt * 0.45) * shade).clamp(0.0, 255.0);
-                        let r = (6.0 + 26.0 * (1.0 - lt) * shade).clamp(0.0, 255.0);
-                        buf[iy as usize * w + ix as usize] = rgb(r, g, 6.0);
+                        let g = (42.0 + 78.0 * (1.0 - lt * 0.45) * shade).clamp(0.0, 255.0);
+                        let r = (5.0 + 22.0 * (1.0 - lt) * shade).clamp(0.0, 255.0);
+                        buf[iy as usize * w + ix as usize] = rgb(r, g, 5.0);
                     }
                 }
             }
@@ -449,13 +449,12 @@ fn draw_palm_shadow(buf: &mut [u32], w: usize, h: usize, cx: f32, cy: f32, rx: f
             if r > 1.0 {
                 continue;
             }
-            let ang = dy.atan2(dx);
-            let n = fbm(x as f32 * 0.04, y as f32 * 0.10, 2);
-            let frond_wave = (ang * 7.0 + n * 2.5).cos() * 0.5 + 0.5;
-            let core = (1.0 - r / 0.30).clamp(0.0, 1.0);
-            let mask = (core + (1.0 - r) * frond_wave * (0.45 + 0.55 * n)).clamp(0.0, 1.0);
-            if mask > 0.25 {
-                darken_pixel(&mut buf[y * w + x], 1.0 - 0.55 * mask);
+            let n = fbm(x as f32 * 0.045, y as f32 * 0.12, 3);
+            let streak = fbm(x as f32 * 0.09, y as f32 * 0.03, 2);
+            let falloff = (1.0 - r).powf(1.5);
+            let mask = (falloff * (0.45 + 0.55 * n) * (0.65 + 0.35 * streak)).clamp(0.0, 1.0);
+            if mask > 0.12 {
+                darken_pixel(&mut buf[y * w + x], 1.0 - 0.36 * mask);
             }
         }
     }
@@ -480,14 +479,14 @@ pub fn generate_background() -> Vec<u32> {
             let xf = x as f32;
             let sh_y = shoreline(xf);
             let col = if yf < 285.0 {
-                // Deep cobalt sky with sparse wispy fBm clouds
+                // Deep cobalt sky with wispy clouds weighted toward right & horizon
                 let t = yf / 285.0;
                 let cloud = fbm(xf * 0.007 + 2.1, yf * 0.022 + 0.4, 4);
-                let wisp = ((cloud - 0.54) * 2.6).clamp(0.0, 1.0);
-                let side_bright = (xf / 800.0) * 16.0;
-                let r = 8.0 + t * 44.0 + side_bright + wisp * 82.0;
-                let g = 34.0 + t * 56.0 + side_bright * 0.8 + wisp * 78.0;
-                let b = 212.0 + t * 24.0 + wisp * 24.0;
+                let region = ((xf / 800.0) * 0.55 + t * 0.45).clamp(0.2, 1.0);
+                let wisp = ((cloud - 0.52) * 2.5 * region).clamp(0.0, 1.0);
+                let r = 14.0 + t * 38.0 + wisp * 95.0;
+                let g = 54.0 + t * 48.0 + wisp * 88.0;
+                let b = 222.0 + t * 14.0 + wisp * 22.0;
                 rgb(r, g, b)
             } else if yf < sh_y {
                 // Ocean with horizon darkening and horizontal wave ripples
@@ -544,8 +543,8 @@ pub fn generate_background() -> Vec<u32> {
     }
 
     // 3. Palm shadows on sand
-    draw_palm_shadow(&mut buf, W, H, 165.0, 378.0, 145.0, 38.0);
-    draw_palm_shadow(&mut buf, W, H, 655.0, 368.0, 125.0, 32.0);
+    draw_palm_shadow(&mut buf, W, H, 120.0, 382.0, 145.0, 32.0);
+    draw_palm_shadow(&mut buf, W, H, 665.0, 360.0, 115.0, 26.0);
 
     // 4. Palm trees (2 left, 3 right)
     draw_palm_tree(&mut buf, W, H, 62.0, 385.0, 44.0, 225.0, 22.0, 68.0, 7.0, 3.0, 122.0, 0.2);
@@ -554,29 +553,25 @@ pub fn generate_background() -> Vec<u32> {
     draw_palm_tree(&mut buf, W, H, 620.0, 340.0, 636.0, 240.0, 656.0, 148.0, 5.8, 2.4, 92.0, 1.1);
     draw_palm_tree(&mut buf, W, H, 732.0, 342.0, 736.0, 260.0, 742.0, 185.0, 5.2, 2.2, 80.0, 0.8);
 
-    // 5. Net shadow on sand (perspective quad from (407, 404)..(465, 397) to (407, 600)..(524, 577))
-    for y in 397..H {
+    // 5. Net shadow on sand (perspective quad from (407, 370)..(442, 368) to (407, 600)..(498, 590))
+    for y in 368..H {
         let yf = y as f32;
         let x_left = 407.0;
-        let t_right = (yf - 397.0) / 180.0;
-        let x_right = 465.0 + t_right * 59.0;
-        let y_top = 404.0 - 7.0 * ((yf - 404.0) / 58.0).clamp(0.0, 1.0);
-        let y_bot = 600.0 - 23.0 * ((x_right - 407.0) / 117.0);
-        let _ = y_bot;
+        let t_right = (yf - 368.0) / 222.0;
+        let x_right = 442.0 + t_right * 56.0;
         for x in (x_left as usize)..=(x_right.ceil() as usize).min(W - 1) {
             let u = ((x as f32 - x_left) / (x_right - x_left).max(1.0)).clamp(0.0, 1.0);
-            let y_top_u = 404.0 - 7.0 * u;
-            let y_bot_u = 600.0 - 23.0 * u;
+            let y_top_u = 370.0 - 2.0 * u;
+            let y_bot_u = 600.0 - 10.0 * u;
             if yf < y_top_u || yf > y_bot_u {
                 continue;
             }
             let v = (yf - y_top_u) / (y_bot_u - y_top_u).max(1.0);
-            let _ = y_top;
             let gu = (u * 5.0).fract();
-            let gv = (v * 16.0).fract();
-            let on_vline = gu < 0.045 || gu > 0.955;
-            let on_hline = gv < 0.045 || gv > 0.955;
-            let on_border = u > 0.94 || v < 0.015 || v > 0.965;
+            let gv = (v * 18.0).fract();
+            let on_vline = gu < 0.032 || gu > 0.968;
+            let on_hline = gv < 0.032 || gv > 0.968;
+            let on_border = u > 0.955 || v < 0.012 || v > 0.975;
             if on_border {
                 darken_pixel(&mut buf[y * W + x], 0.42);
             } else if on_vline || on_hline {
