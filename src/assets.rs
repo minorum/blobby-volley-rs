@@ -49,7 +49,10 @@ impl LocalizedText {
                 current = line.to_string();
                 sections.entry(current.clone()).or_default();
             } else if !current.is_empty() {
-                sections.entry(current.clone()).or_default().push(line.to_string());
+                sections
+                    .entry(current.clone())
+                    .or_default()
+                    .push(line.to_string());
             }
         }
         Self { sections }
@@ -65,8 +68,8 @@ impl LocalizedText {
 }
 
 pub struct GameAssets {
-    pub bg: Vec<u32>,          // 800x600 top-down (matches Framebuffer)
-    pub bg_dark: Vec<u32>,     // 800x600 top-down (1/8 brightness for menus)
+    pub bg: Vec<u32>,                       // 800x600 top-down (matches Framebuffer)
+    pub bg_dark: Vec<u32>,                  // 800x600 top-down (1/8 brightness for menus)
     pub ball_frames: Vec<BmpImage>,         // 16 frames of 64x64
     pub blobby_base: Vec<BmpImage>,         // 5 frames of 148x101 (grayscale base)
     pub blobby_colored: [Vec<BmpImage>; 2], // 5 frames per player

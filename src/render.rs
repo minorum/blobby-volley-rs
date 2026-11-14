@@ -5,7 +5,7 @@ use crate::sim::MatchState;
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
 pub const CHAR_ADVANCE: i32 = 20; // DAT_0044db4c = 0x14
-pub const LINE_HEIGHT: i32 = 24;  // DAT_0044db50 = 0x18
+pub const LINE_HEIGHT: i32 = 24; // DAT_0044db50 = 0x18
 
 pub struct Framebuffer {
     pub pixels: Vec<u32>,
@@ -19,7 +19,12 @@ impl Framebuffer {
     }
 
     #[inline]
-    fn clip_rect_bu(x0: i32, y0: i32, w: i32, h: i32) -> Option<(usize, usize, usize, usize, usize, usize)> {
+    fn clip_rect_bu(
+        x0: i32,
+        y0: i32,
+        w: i32,
+        h: i32,
+    ) -> Option<(usize, usize, usize, usize, usize, usize)> {
         let x_start = x0.max(0);
         let x_end = (x0 + w).min(WIDTH as i32);
         let y_start = y0.max(0);
@@ -224,8 +229,22 @@ impl Framebuffer {
             let s = scores[i].clamp(0, 99) as u8;
             let d0 = [b'0' + s / 10];
             let d1 = [b'0' + s % 10];
-            self.draw_text(assets, score_x[i], 540, false, false, std::str::from_utf8(&d0).unwrap());
-            self.draw_text(assets, score_x[i] + 24, 540, false, false, std::str::from_utf8(&d1).unwrap());
+            self.draw_text(
+                assets,
+                score_x[i],
+                540,
+                false,
+                false,
+                std::str::from_utf8(&d0).unwrap(),
+            );
+            self.draw_text(
+                assets,
+                score_x[i] + 24,
+                540,
+                false,
+                false,
+                std::str::from_utf8(&d1).unwrap(),
+            );
             if serves[i] {
                 self.draw_text(assets, score_x[i] + 48, 540, false, false, "!");
                 if mp && blink_on {
@@ -265,31 +284,31 @@ impl Framebuffer {
 pub fn char_to_glyph(ch: char) -> Option<(usize, bool)> {
     let code = ch as u32;
     let idx = match code {
-        0x30..=0x39 => (code - 0x30) as usize,       // '0'..'9' -> 0..9
-        0x41..=0x5A => (code - 0x37) as usize,       // 'A'..'Z' -> 10..35
+        0x30..=0x39 => (code - 0x30) as usize, // '0'..'9' -> 0..9
+        0x41..=0x5A => (code - 0x37) as usize, // 'A'..'Z' -> 10..35
         0x61..=0x7A => return Some(((code - 0x57) as usize, true)), // 'a'..'z' -> 10..35 lowercase
-        0x2E => 0x24, // '.'
-        0x21 => 0x25, // '!'
-        0x28 => 0x26, // '('
-        0x29 => 0x27, // ')'
-        0xDF => 0x28, // 'ß'
-        0xC4 => 0x29, // 'Ä'
-        0xD6 => 0x2A, // 'Ö'
-        0xDC => 0x2B, // 'Ü'
-        0xE4 => return Some((0x29, true)), // 'ä'
-        0xF6 => return Some((0x2A, true)), // 'ö'
-        0xFC => return Some((0x2B, true)), // 'ü'
-        0x27 => 0x2C, // '\''
-        0x3A => 0x2D, // ':'
-        0x3B => 0x2E, // ';'
-        0x3F => 0x2F, // '?'
-        0x2C => 0x30, // ','
-        0x2F => 0x31, // '/'
-        0x2D => 0x32, // '-'
-        0x3C => 0x33, // '<' (P1 icon)
-        0x3E => 0x34, // '>' (P2 icon)
-        0xB2 => 0x35, // '²'
-        0xB3 => 0x36, // '³'
+        0x2E => 0x24,                          // '.'
+        0x21 => 0x25,                          // '!'
+        0x28 => 0x26,                          // '('
+        0x29 => 0x27,                          // ')'
+        0xDF => 0x28,                          // 'ß'
+        0xC4 => 0x29,                          // 'Ä'
+        0xD6 => 0x2A,                          // 'Ö'
+        0xDC => 0x2B,                          // 'Ü'
+        0xE4 => return Some((0x29, true)),     // 'ä'
+        0xF6 => return Some((0x2A, true)),     // 'ö'
+        0xFC => return Some((0x2B, true)),     // 'ü'
+        0x27 => 0x2C,                          // '\''
+        0x3A => 0x2D,                          // ':'
+        0x3B => 0x2E,                          // ';'
+        0x3F => 0x2F,                          // '?'
+        0x2C => 0x30,                          // ','
+        0x2F => 0x31,                          // '/'
+        0x2D => 0x32,                          // '-'
+        0x3C => 0x33,                          // '<' (P1 icon)
+        0x3E => 0x34,                          // '>' (P2 icon)
+        0xB2 => 0x35,                          // '²'
+        0xB3 => 0x36,                          // '³'
         _ => return None,
     };
     Some((idx, false))

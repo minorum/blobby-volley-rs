@@ -16,7 +16,10 @@ use crate::render::{HEIGHT, WIDTH};
 fn main() {
     let asset_dir = find_asset_dir();
     let assets = GameAssets::load(&asset_dir).unwrap_or_else(|e| {
-        eprintln!("Failed to load game assets from {}: {e}", asset_dir.display());
+        eprintln!(
+            "Failed to load game assets from {}: {e}",
+            asset_dir.display()
+        );
         std::process::exit(1);
     });
 

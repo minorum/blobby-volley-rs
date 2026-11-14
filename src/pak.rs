@@ -137,7 +137,11 @@ pub fn parse_bmp(data: &[u8]) -> Result<BmpImage, String> {
         8 => {
             let palette_offset = 14 + header_size;
             let colors_used = u32::from_le_bytes(data[46..50].try_into().unwrap()) as usize;
-            let num_colors = if colors_used == 0 { 256 } else { colors_used.min(256) };
+            let num_colors = if colors_used == 0 {
+                256
+            } else {
+                colors_used.min(256)
+            };
             if data.len() < palette_offset + num_colors * 4 {
                 return Err("Truncated BMP palette".to_string());
             }

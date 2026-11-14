@@ -366,10 +366,7 @@ impl RallySim {
                 events.whistle = true;
             }
             self.rally_over_ticks += 1;
-            if self.rally_over_ticks > 60
-                && self.players[0].y == 100
-                && self.players[1].y == 100
-            {
+            if self.rally_over_ticks > 60 && self.players[0].y == 100 && self.players[1].y == 100 {
                 return (events, Some(self.point_for_server));
             }
         }
@@ -379,8 +376,7 @@ impl RallySim {
 
     fn predict_ball_x(&self, target_y: i32) -> i32 {
         let f1 = (-(self.ball.vy) as f32) / -3.5;
-        let f3 = ((target_y << 6) as f32) / -3.5
-            + (f1 * f1 - ((self.ball.y * 2) as f32) / -3.5);
+        let f3 = ((target_y << 6) as f32) / -3.5 + (f1 * f1 - ((self.ball.y * 2) as f32) / -3.5);
         if f3 >= 0.0 {
             let sq = f3.sqrt();
             let mut t = f1 + sq;
@@ -723,7 +719,8 @@ impl MatchState {
             return false;
         }
         let s = self.rally.server;
-        self.rally.players[s].score > 13 && self.rally.players[s].score > self.rally.players[1 - s].score
+        self.rally.players[s].score > 13
+            && self.rally.players[s].score > self.rally.players[1 - s].score
     }
 }
 

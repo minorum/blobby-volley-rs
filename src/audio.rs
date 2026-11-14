@@ -1,6 +1,6 @@
+use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::io::Cursor;
 use std::sync::Arc;
-use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 
 pub struct SoundEngine {
     _stream: Option<OutputStream>,

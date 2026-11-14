@@ -61,7 +61,14 @@ impl NetHost {
                 self.peer_color = (buf[4] as usize) % 8;
                 let nlen = (buf[5] as usize).min(len - 6).min(12);
                 self.peer_name = String::from_utf8_lossy(&buf[6..6 + nlen]).to_string();
-                let mut ack = vec![b'B', b'V', b'O', b'K', host_color as u8, host_name.len().min(12) as u8];
+                let mut ack = vec![
+                    b'B',
+                    b'V',
+                    b'O',
+                    b'K',
+                    host_color as u8,
+                    host_name.len().min(12) as u8,
+                ];
                 ack.extend_from_slice(&host_name.as_bytes()[..host_name.len().min(12)]);
                 let _ = self.game_sock.send_to(&ack, src);
                 return true;
@@ -102,7 +109,11 @@ impl NetHost {
         pkt[22] = (rally.ball.spin_phase >> 3) as u8;
         pkt[23] = rally.players[0].score as u8;
         pkt[24] = rally.players[1].score as u8;
-        pkt[25] = if rally.is_first_rally { 0xFF } else { rally.server as u8 };
+        pkt[25] = if rally.is_first_rally {
+            0xFF
+        } else {
+            rally.server as u8
+        };
         pkt[26] = sound_mask;
         let _ = self.game_sock.send_to(&pkt, peer);
     }
@@ -145,7 +156,9 @@ impl NetClient {
         };
         let _ = self.sock.send_to(b"BVQ?", addr_str);
         if target_ip.trim().is_empty() {
-            let _ = self.sock.send_to(b"BVQ?", format!("127.0.0.1:{DISCOVERY_PORT}"));
+            let _ = self
+                .sock
+                .send_to(b"BVQ?", format!("127.0.0.1:{DISCOVERY_PORT}"));
         }
     }
 
@@ -167,11 +180,19 @@ impl NetClient {
                 }
             }
         }
-        self.sessions.retain(|s| s.last_seen.elapsed() < Duration::from_secs(10));
+        self.sessions
+            .retain(|s| s.last_seen.elapsed() < Duration::from_secs(10));
     }
 
     pub fn join(&mut self, addr: SocketAddr, my_name: &str, my_color: usize) -> bool {
-        let mut pkt = vec![b'B', b'V', b'J', b'N', my_color as u8, my_name.len().min(12) as u8];
+        let mut pkt = vec![
+            b'B',
+            b'V',
+            b'J',
+            b'N',
+            my_color as u8,
+            my_name.len().min(12) as u8,
+        ];
         pkt.extend_from_slice(&my_name.as_bytes()[..my_name.len().min(12)]);
         for _ in 0..5 {
             let _ = self.sock.send_to(&pkt, addr);
@@ -192,7 +213,8 @@ impl NetClient {
 
     pub fn send_input(&self, input: PlayerInput) {
         let Some(addr) = self.host_addr else { return };
-        let bits = (u8::from(input.left)) | (u8::from(input.right) << 1) | (u8::from(input.jump) << 2);
+        let bits =
+            (u8::from(input.left)) | (u8::from(input.right) << 1) | (u8::from(input.jump) << 2);
         let pkt = [b'B', b'V', b'I', b'N', bits];
         let _ = self.sock.send_to(&pkt, addr);
     }
