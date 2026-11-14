@@ -1,6 +1,13 @@
 use crate::assets::GameAssets;
-use crate::pak::BmpImage;
 use crate::sim::MatchState;
+
+/// 32-bit `0x00RRGGBB` sprite stored bottom-up (row 0 = bottom scanline).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Sprite {
+    pub width: usize,
+    pub height: usize,
+    pub pixels: Vec<u32>,
+}
 
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
@@ -63,7 +70,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_title_logo(&mut self, logo: &BmpImage, dim_shift: u32) {
+    pub fn draw_title_logo(&mut self, logo: &Sprite, dim_shift: u32) {
         let Some((xs, xe, ys, ye, src_x0, src_y0)) =
             Self::clip_rect_bu(30, 360, logo.width as i32, logo.height as i32)
         else {
@@ -89,7 +96,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_sprite_bu(&mut self, img: &BmpImage, x0: i32, y0: i32) {
+    pub fn draw_sprite_bu(&mut self, img: &Sprite, x0: i32, y0: i32) {
         let Some((xs, xe, ys, ye, src_x0, src_y0)) =
             Self::clip_rect_bu(x0, y0, img.width as i32, img.height as i32)
         else {
@@ -109,7 +116,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_shadow_bu(&mut self, img: &BmpImage, x0: i32, y0: i32) {
+    pub fn draw_shadow_bu(&mut self, img: &Sprite, x0: i32, y0: i32) {
         let Some((xs, xe, ys, ye, src_x0, src_y0)) =
             Self::clip_rect_bu(x0, y0, img.width as i32, img.height as i32)
         else {
@@ -129,7 +136,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_cursor(&mut self, cursor: &BmpImage, mx: i32, my_bu: i32) {
+    pub fn draw_cursor(&mut self, cursor: &Sprite, mx: i32, my_bu: i32) {
         self.draw_sprite_bu(cursor, mx, my_bu - 47);
     }
 
@@ -328,7 +335,7 @@ mod tests {
         // Outside rect stays unchanged
         assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH + 10], 0x00808080);
 
-        let img = BmpImage {
+        let img = Sprite {
             width: 4,
             height: 4,
             pixels: vec![0x00FF0000; 16],

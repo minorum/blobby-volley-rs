@@ -1,11 +1,11 @@
-use crate::pak::BmpImage;
+use crate::render::Sprite;
 
 /// Generates all 16 rotation frames (64x64) of the volleyball procedurally.
 ///
 /// Uses a unit-sphere shading model with wrap diffuse lighting from the top-left
 /// and an 18-panel seam pattern rotated by `22.5` degrees per frame, matching the
 /// original `sum < 0xB4` transparency threshold.
-pub fn generate_ball_frames() -> Vec<BmpImage> {
+pub fn generate_ball_frames() -> Vec<Sprite> {
     const W: usize = 64;
     const H: usize = 64;
     const R: f32 = 32.45;
@@ -25,7 +25,7 @@ pub fn generate_ball_frames() -> Vec<BmpImage> {
         let (ca, sa) = (ang.cos(), ang.sin());
         let mut pixels = vec![0u32; W * H];
 
-        // Store bottom-up (row 0 = bottom scanline) to match BmpImage convention.
+        // Store bottom-up (row 0 = bottom scanline) to match Sprite convention.
         for by in 0..H {
             let y_td = (H - 1 - by) as f32;
             let ny0 = (CY - y_td) / R;
@@ -76,7 +76,7 @@ pub fn generate_ball_frames() -> Vec<BmpImage> {
                 }
             }
         }
-        frames.push(BmpImage {
+        frames.push(Sprite {
             width: W,
             height: H,
             pixels,
@@ -124,7 +124,7 @@ fn normalize3(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
 ///
 /// Uses an orthographic raymarched 3D smooth-union SDF of two ellipsoids (head + body)
 /// with two-light Phong shading matching the original specular highlights and base tones.
-pub fn generate_blobby_frames() -> Vec<BmpImage> {
+pub fn generate_blobby_frames() -> Vec<Sprite> {
     const W: usize = 148;
     const H: usize = 101;
     const CX: f32 = 73.0;
@@ -188,7 +188,7 @@ pub fn generate_blobby_frames() -> Vec<BmpImage> {
                 }
             }
         }
-        frames.push(BmpImage {
+        frames.push(Sprite {
             width: W,
             height: H,
             pixels,
@@ -198,7 +198,7 @@ pub fn generate_blobby_frames() -> Vec<BmpImage> {
 }
 
 /// Generates the 69x17 checkerboard-dithered ball shadow mask.
-pub fn generate_ball_shadow() -> BmpImage {
+pub fn generate_ball_shadow() -> Sprite {
     const W: usize = 69;
     const H: usize = 17;
     let mut pixels = vec![0u32; W * H];
@@ -215,7 +215,7 @@ pub fn generate_ball_shadow() -> BmpImage {
             }
         }
     }
-    BmpImage {
+    Sprite {
         width: W,
         height: H,
         pixels,
@@ -224,7 +224,7 @@ pub fn generate_ball_shadow() -> BmpImage {
 
 /// Generates all 10 checkerboard-dithered Blobby shadow masks (129x25)
 /// from the 5 base Blobby silhouettes (0..5 for P1, 5..10 mirrored for P2).
-pub fn generate_blobby_shadows(blobby_base: &[BmpImage]) -> Vec<BmpImage> {
+pub fn generate_blobby_shadows(blobby_base: &[Sprite]) -> Vec<Sprite> {
     const W: usize = 129;
     const H: usize = 25;
     let mut shadows = Vec::with_capacity(10);
@@ -252,7 +252,7 @@ pub fn generate_blobby_shadows(blobby_base: &[BmpImage]) -> Vec<BmpImage> {
                     }
                 }
             }
-            shadows.push(BmpImage {
+            shadows.push(Sprite {
                 width: W,
                 height: H,
                 pixels,
@@ -705,7 +705,7 @@ fn glyph_strokes(idx: usize) -> &'static [&'static [(f32, f32)]] {
 /// - 0..=50: beveled italic glyphs with colorful plasma gradients
 /// - 51..=52: grayscale 24x24 Blobby player icons (for P1/P2 color tinting)
 /// - 53..=54: rainbow up/down arrows ('²' and '³')
-pub fn generate_font_glyphs(blobby_base0: &BmpImage) -> Vec<BmpImage> {
+pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
     const W: usize = 24;
     const H: usize = 24;
     let mut glyphs = Vec::with_capacity(55);
@@ -786,7 +786,7 @@ pub fn generate_font_glyphs(blobby_base0: &BmpImage) -> Vec<BmpImage> {
                 }
             }
         }
-        glyphs.push(BmpImage {
+        glyphs.push(Sprite {
             width: W,
             height: H,
             pixels,
@@ -813,7 +813,7 @@ fn point_in_triangle_dist(px: f32, py: f32, a: (f32, f32), b: (f32, f32), c: (f3
 }
 
 /// Generates the 48x48 beveled green pointer cursor.
-pub fn generate_cursor() -> BmpImage {
+pub fn generate_cursor() -> Sprite {
     const W: usize = 48;
     const H: usize = 48;
     let mut pixels = vec![0u32; W * H];
@@ -851,7 +851,7 @@ pub fn generate_cursor() -> BmpImage {
             }
         }
     }
-    BmpImage {
+    Sprite {
         width: W,
         height: H,
         pixels,
@@ -909,7 +909,7 @@ fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
 
 /// Generates the 410x230 "Blobby Volley" title logo with bumpy blue outline,
 /// speckled green lettering, and embedded miniature volleyball.
-pub fn generate_title_logo() -> BmpImage {
+pub fn generate_title_logo() -> Sprite {
     const W: usize = 410;
     const H: usize = 230;
     let mut pixels = vec![0u32; W * H];
@@ -956,7 +956,7 @@ pub fn generate_title_logo() -> BmpImage {
             }
         }
     }
-    BmpImage {
+    Sprite {
         width: W,
         height: H,
         pixels,
@@ -1046,7 +1046,7 @@ fn draw_card_text(buf: &mut [u32], w: usize, h: usize, x0: f32, y0: f32, cw: f32
 }
 
 /// Generates the 400x300 woven-paper ending credits splash card.
-pub fn generate_ending_splash() -> BmpImage {
+pub fn generate_ending_splash() -> Sprite {
     const W: usize = 400;
     const H: usize = 300;
     let mut pixels = vec![0u32; W * H];
@@ -1076,7 +1076,7 @@ pub fn generate_ending_splash() -> BmpImage {
     draw_card_text(&mut pixels, W, H, 26.0, 248.0, 11.5, 15.0, "www.t-online.de/home/skoraszewsky/");
     draw_card_text(&mut pixels, W, H, 26.0, 270.0, 11.5, 15.0, "www.t-online.de/home/mummertathome/");
 
-    BmpImage {
+    Sprite {
         width: W,
         height: H,
         pixels,

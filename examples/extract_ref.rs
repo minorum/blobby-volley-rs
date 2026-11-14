@@ -1,7 +1,10 @@
+#[path = "common/mod.rs"]
+mod pak_ref;
+
 use std::fs;
 use std::path::PathBuf;
 
-use blobby_volley_rs::pak::{load_pak_file, parse_bmp};
+use pak_ref::{load_pak_file, parse_bmp};
 
 fn main() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

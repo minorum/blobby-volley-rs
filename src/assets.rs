@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::pak::BmpImage;
+use crate::render::Sprite;
 use crate::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
     generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
@@ -42,26 +42,6 @@ pub struct LocalizedText {
 }
 
 impl LocalizedText {
-    pub fn parse(raw: &[u8]) -> Self {
-        // Text files in text.pak are Windows-1252 / ISO-8859-1 encoded with CRLF.
-        let text: String = raw.iter().map(|&b| b as char).collect();
-        let mut sections: HashMap<String, Vec<String>> = HashMap::new();
-        let mut current = String::new();
-        for line in text.lines() {
-            let line = line.trim_end_matches('\r');
-            if line.starts_with('@') {
-                current = line.to_string();
-                sections.entry(current.clone()).or_default();
-            } else if !current.is_empty() {
-                sections
-                    .entry(current.clone())
-                    .or_default()
-                    .push(line.to_string());
-            }
-        }
-        Self { sections }
-    }
-
     pub fn french() -> Self {
         Self::from_pairs(&[
             ("@main", &["Jouer", "Jeu en reseau", "Statistiques", "Reglages", "Deutsch", "Fin"]),
@@ -136,16 +116,16 @@ impl LocalizedText {
 pub struct GameAssets {
     pub bg: Vec<u32>,                       // 800x600 top-down (matches Framebuffer)
     pub bg_dark: Vec<u32>,                  // 800x600 top-down (1/8 brightness for menus)
-    pub ball_frames: Vec<BmpImage>,         // 16 frames of 64x64
-    pub blobby_base: Vec<BmpImage>,         // 5 frames of 148x101 (grayscale base)
-    pub blobby_colored: [Vec<BmpImage>; 2], // 5 frames per player
-    pub font_glyphs: Vec<BmpImage>,         // 55 glyphs of 24x24
-    pub font_icon_base: BmpImage,           // base glyph 51 (0x33) for player color icons
-    pub blobby_shadows: Vec<BmpImage>,      // 10 frames of 129x25 (actually 5 mirrored/frames)
-    pub ball_shadow: BmpImage,              // 69x17
-    pub cursor: BmpImage,                   // 48x48
-    pub title_logo: BmpImage,               // entry 89 (410x230)
-    pub ending_splash: BmpImage,            // entry 90 (400x300)
+    pub ball_frames: Vec<Sprite>,         // 16 frames of 64x64
+    pub blobby_base: Vec<Sprite>,         // 5 frames of 148x101 (grayscale base)
+    pub blobby_colored: [Vec<Sprite>; 2], // 5 frames per player
+    pub font_glyphs: Vec<Sprite>,         // 55 glyphs of 24x24
+    pub font_icon_base: Sprite,           // base glyph 51 (0x33) for player color icons
+    pub blobby_shadows: Vec<Sprite>,      // 10 frames of 129x25 (actually 5 mirrored/frames)
+    pub ball_shadow: Sprite,              // 69x17
+    pub cursor: Sprite,                   // 48x48
+    pub title_logo: Sprite,               // entry 89 (410x230)
+    pub ending_splash: Sprite,            // entry 90 (400x300)
     pub sounds: [Arc<[u8]>; 2],             // 0: whistle, 1: hit/menu click
     pub texts: [LocalizedText; 3],          // 0: FR, 1: DE, 2: EN
 }
@@ -260,13 +240,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn localized_text_parses_sections_and_crlf() {
-        let raw = b"@main\r\nStart\r\nQuit\r\n@names\r\nAdam\r\n";
-        let lt = LocalizedText::parse(raw);
-        assert_eq!(lt.get("@main", 0), "Start");
-        assert_eq!(lt.get("@main", 1), "Quit");
-        assert_eq!(lt.get("@names", 0), "Adam");
-        assert_eq!(lt.get("@missing", 0), "");
+    fn localized_text_tables_have_expected_entries() {
+        let fr = LocalizedText::french();
+        let de = LocalizedText::german();
+        let en = LocalizedText::english();
+        assert_eq!(fr.get("@main", 0), "Jouer");
+        assert_eq!(de.get("@main", 0), "Spiel starten");
+        assert_eq!(en.get("@main", 0), "Start Game");
+        assert_eq!(en.get("@names", 0), "Adam");
+        assert_eq!(en.get("@missing", 0), "");
+    }
+
+    #[test]
+    fn game_assets_generate_is_deterministic_and_valid() {
+        let a = GameAssets::generate();
+        let b = GameAssets::generate();
+        assert_eq!(a.bg.len(), 800 * 600);
+        assert_eq!(a.bg, b.bg);
+        assert_eq!(a.ball_frames.len(), 16);
+        assert_eq!((a.ball_frames[0].width, a.ball_frames[0].height), (64, 64));
+        assert_eq!(a.ball_frames, b.ball_frames);
+        assert_eq!(a.blobby_base.len(), 5);
+        assert_eq!((a.blobby_base[0].width, a.blobby_base[0].height), (148, 101));
+        assert_eq!(a.blobby_shadows.len(), 10);
+        assert_eq!((a.ball_shadow.width, a.ball_shadow.height), (69, 17));
+        assert_eq!(a.font_glyphs.len(), 55);
+        assert_eq!((a.cursor.width, a.cursor.height), (48, 48));
+        assert_eq!((a.title_logo.width, a.title_logo.height), (410, 230));
+        assert_eq!((a.ending_splash.width, a.ending_splash.height), (400, 300));
+        assert_eq!(&a.sounds[0][0..4], b"RIFF");
+        assert_eq!(&a.sounds[1][0..4], b"RIFF");
     }
 
     #[test]

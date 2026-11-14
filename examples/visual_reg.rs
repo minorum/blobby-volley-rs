@@ -1,12 +1,19 @@
+#[path = "common/mod.rs"]
+mod pak_ref;
+
 use std::fs;
 use std::path::PathBuf;
+use std::time::Instant;
 
-use blobby_volley_rs::pak::{load_pak_file, parse_bmp, BmpImage};
+use blobby_volley_rs::assets::GameAssets;
 use blobby_volley_rs::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
     generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
     generate_title_logo,
 };
+use blobby_volley_rs::render::{Framebuffer, Sprite};
+use blobby_volley_rs::sim::{MatchState, PlayerControl};
+use pak_ref::{load_pak_file, parse_bmp, BmpImage};
 
 struct Metrics {
     mae: f64,
@@ -14,7 +21,7 @@ struct Metrics {
     iou: f64,
 }
 
-fn compare_images(ref_img: &BmpImage, proc_img: &BmpImage) -> Metrics {
+fn compare_images(ref_img: &BmpImage, proc_img: &Sprite) -> Metrics {
     assert_eq!(ref_img.width, proc_img.width);
     assert_eq!(ref_img.height, proc_img.height);
     let mut abs_sum = 0u64;
@@ -55,7 +62,7 @@ fn compare_images(ref_img: &BmpImage, proc_img: &BmpImage) -> Metrics {
     Metrics { mae, psnr, iou }
 }
 
-fn save_side_by_side(path: &PathBuf, ref_img: &BmpImage, proc_img: &BmpImage) {
+fn save_side_by_side(path: &PathBuf, ref_img: &BmpImage, proc_img: &Sprite) {
     let w = ref_img.width;
     let h = ref_img.height;
     let out_w = w * 3;
@@ -186,7 +193,7 @@ fn main() {
         proc_bg_bu[(599 - y) * 800..(600 - y) * 800]
             .copy_from_slice(&proc_bg_td[y * 800..(y + 1) * 800]);
     }
-    let proc_bg = BmpImage {
+    let proc_bg = Sprite {
         width: 800,
         height: 600,
         pixels: proc_bg_bu,
@@ -198,7 +205,7 @@ fn main() {
     // 5. Font glyphs (22..=76, 55 glyphs of 24x24)
     let proc_font = generate_font_glyphs(&proc_blobby[0]);
     let mut font_iou = 0.0;
-    let mut font_sheet_proc = BmpImage {
+    let mut font_sheet_proc = Sprite {
         width: 24 * 11,
         height: 24 * 5,
         pixels: vec![0u32; 24 * 11 * 24 * 5],
@@ -252,4 +259,21 @@ fn main() {
     let m_end = compare_images(&ref_end, &proc_end);
     save_side_by_side(&out_dir.join("ending_splash.ppm"), &ref_end, &proc_end);
     println!("Ending splash: MAE={:.2}, PSNR={:.2} dB", m_end.mae, m_end.psnr);
+
+    // 7. Benchmark procedural asset generation and per-frame rendering
+    let t0 = Instant::now();
+    let assets = GameAssets::generate();
+    let gen_ms = t0.elapsed().as_secs_f64() * 1000.0;
+
+    let mut fb = Framebuffer::new();
+    let m = MatchState::new([PlayerControl::AiMedium, PlayerControl::AiMedium], 1);
+    let names = ["Player 1".to_string(), "Player 2".to_string()];
+    let t1 = Instant::now();
+    for tick in 0..1000u32 {
+        fb.draw_match(&assets, &m, &names, tick * 16);
+    }
+    let render_us = t1.elapsed().as_secs_f64() * 1_000_000.0 / 1000.0;
+    println!(
+        "Benchmark: GameAssets::generate() = {gen_ms:.2} ms, draw_match() = {render_us:.1} us/frame"
+    );
 }
