@@ -742,37 +742,6 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
         } else {
             // 53: Up arrow, 54: Down arrow (exact 24x24 silhouette: 12-row head + 10-row shaft)
             let is_up = idx == 53;
-            let stops: &[(f32, [f32; 3])] = if is_up {
-                &[
-                    (1.0, [252.0, 118.0, 119.0]),
-                    (6.0, [251.0, 44.0, 67.0]),
-                    (12.0, [193.0, 2.0, 110.0]),
-                    (17.0, [182.0, 11.0, 226.0]),
-                    (22.0, [78.0, 2.0, 159.0]),
-                ]
-            } else {
-                &[
-                    (1.0, [241.0, 82.0, 249.0]),
-                    (6.0, [227.0, 21.0, 232.0]),
-                    (12.0, [59.0, 141.0, 129.0]),
-                    (17.0, [52.0, 153.0, 64.0]),
-                    (22.0, [147.0, 8.0, 151.0]),
-                ]
-            };
-            let sample_stops = |y: f32| -> (f32, f32, f32) {
-                for w in stops.windows(2) {
-                    if y <= w[1].0 {
-                        let t = ((y - w[0].0) / (w[1].0 - w[0].0)).clamp(0.0, 1.0);
-                        return (
-                            w[0].1[0] + (w[1].1[0] - w[0].1[0]) * t,
-                            w[0].1[1] + (w[1].1[1] - w[0].1[1]) * t,
-                            w[0].1[2] + (w[1].1[2] - w[0].1[2]) * t,
-                        );
-                    }
-                }
-                let last = stops[stops.len() - 1].1;
-                (last[0], last[1], last[2])
-            };
             for by in 0..H {
                 let top_y = H - 1 - by;
                 let dir_y = if is_up { top_y } else { by };
@@ -786,10 +755,28 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
                 if hw == 0 {
                     continue;
                 }
-                let (r, g, b) = sample_stops(top_y as f32);
-                let col = rgb(r, g, b);
+                let v = top_y as f32 / 24.0;
                 for x in (12 - hw)..(12 + hw) {
-                    pixels[by * W + x] = col;
+                    let u = x as f32 / 24.0;
+                    let (r, g, b) = if is_up {
+                        let a_rg = -0.5 * (u + v);
+                        let a_b = -6.0 * u - 7.0 * v;
+                        (
+                            -3449.3 - 1434.4 * a_rg.sin() + 3423.9 * a_rg.cos(),
+                            1759.5 + 983.0 * a_rg.sin() - 1465.7 * a_rg.cos(),
+                            140.6 - 99.4 * a_b.sin() + 3.3 * a_b.cos(),
+                        )
+                    } else {
+                        let a_r = -2.0 * u - 7.0 * v;
+                        let a_g = -4.5 * u - 8.0 * v;
+                        let a_b = -4.0 * u - 5.5 * v;
+                        (
+                            135.9 - 106.8 * a_r.sin() - 59.6 * a_r.cos(),
+                            93.0 - 75.4 * a_g.sin() + 42.0 * a_g.cos(),
+                            160.9 - 43.5 * a_b.sin() - 102.4 * a_b.cos(),
+                        )
+                    };
+                    pixels[by * W + x] = rgb(r, g, b);
                 }
             }
         }

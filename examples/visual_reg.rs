@@ -616,6 +616,48 @@ fn main() {
             m.fg_mae, m.iou, m.boundary_f1
         );
     }
+    // Export 4x zoomed contact sheet for glyphs 51..=54 (ref | proc | diff)
+    {
+        const SCALE: usize = 4;
+        let cw = 24 * SCALE;
+        let ch = 24 * SCALE;
+        let mut sheet = format!("P6\n{} {}\n255\n", cw * 3, ch * 4).into_bytes();
+        for (row_idx, k) in (51..=54).enumerate() {
+            let mut ref_img = parse_bmp(&graph[22 + k]).unwrap();
+            for p in &mut ref_img.pixels {
+                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+                if sum < 0x28 {
+                    *p = 0;
+                }
+            }
+            let proc_img = &proc_font[k];
+            let _ = row_idx;
+            for py in 0..ch {
+                let by = 23 - py / SCALE;
+                for panel in 0..3 {
+                    for px in 0..cw {
+                        let x = px / SCALE;
+                        let rp = ref_img.pixels[by * 24 + x];
+                        let pp = proc_img.pixels[by * 24 + x];
+                        let col = match panel {
+                            0 => rp,
+                            1 => pp,
+                            _ => {
+                                let dr = (((rp >> 16) & 0xFF) as i32 - ((pp >> 16) & 0xFF) as i32).abs().min(255) as u32;
+                                let dg = (((rp >> 8) & 0xFF) as i32 - ((pp >> 8) & 0xFF) as i32).abs().min(255) as u32;
+                                let db = ((rp & 0xFF) as i32 - (pp & 0xFF) as i32).abs().min(255) as u32;
+                                (dr << 16) | (dg << 8) | db
+                            }
+                        };
+                        sheet.push(((col >> 16) & 0xFF) as u8);
+                        sheet.push(((col >> 8) & 0xFF) as u8);
+                        sheet.push((col & 0xFF) as u8);
+                    }
+                }
+            }
+        }
+        let _ = fs::write(out_dir.join("font_extra_51_54.ppm"), sheet);
+    }
 
     // 6. Cursor, Title logo, Ending splash
     let ref_cursor = parse_bmp(&graph[88]).unwrap();
@@ -649,6 +691,30 @@ fn main() {
         let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
         if p != 0 && !(g > b + 20 && g > r + 10) && b > r + 20 && b > g + 10 { p } else { 0 }
     };
+    // Derive an encompassing ball ROI directly from the reference logo's neutral volleyball pixels
+    // inside the 'o' of "Volley" (x in 215..290, top-down y in 130..200), expanded by +6 px margin.
+    let (mut sx_sum, mut sy_sum, mut s_cnt) = (0.0f32, 0.0f32, 0usize);
+    for by in 0..230usize {
+        let py = (229 - by) as f32 + 0.5;
+        if !(130.0..=200.0).contains(&py) {
+            continue;
+        }
+        for x in 215..290usize {
+            let p = ref_logo.pixels[by * 410 + x];
+            if p != 0 && is_green_core(p) == 0 && is_blue_bubble(p) == 0 {
+                sx_sum += x as f32 + 0.5;
+                sy_sum += py;
+                s_cnt += 1;
+            }
+        }
+    }
+    let ref_ball_cx = sx_sum / s_cnt.max(1) as f32;
+    let ref_ball_cy = sy_sum / s_cnt.max(1) as f32;
+    let ref_ball_r = (s_cnt as f32 / std::f32::consts::PI).sqrt();
+    let ball_roi_r2 = (ref_ball_r + 6.0).powi(2);
+
+    // Classify the reference-grounded ball ROI FIRST (independent of green/blue color predicates),
+    // then partition remaining pixels into green lettering, blue bubble, and other edge pixels.
     let segment_logo = |px_buf: &[u32]| -> (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) {
         let n = px_buf.len();
         let (mut gr, mut bl, mut ball, mut other) = (vec![0; n], vec![0; n], vec![0; n], vec![0; n]);
@@ -661,13 +727,13 @@ fn main() {
                     continue;
                 }
                 let px = x as f32 + 0.5;
-                let in_ball_disc = (px - 251.6).powi(2) + (py - 164.7).powi(2) <= 25.0 * 25.0;
-                if is_green_core(p) != 0 {
+                let in_ball_roi = (px - ref_ball_cx).powi(2) + (py - ref_ball_cy).powi(2) <= ball_roi_r2;
+                if in_ball_roi {
+                    ball[i] = p;
+                } else if is_green_core(p) != 0 {
                     gr[i] = p;
                 } else if is_blue_bubble(p) != 0 {
                     bl[i] = p;
-                } else if in_ball_disc {
-                    ball[i] = p;
                 } else {
                     other[i] = p;
                 }
@@ -681,12 +747,45 @@ fn main() {
     let m_logo_b = compare_images(&ref_blue, &proc_blue, 410, 230, true);
     let m_logo_w = compare_images(&ref_ball_seg, &proc_ball_seg, 410, 230, true);
     let m_logo_o = compare_images(&ref_other_seg, &proc_other_seg, 410, 230, true);
+    let ref_other_px = ref_other_seg.iter().filter(|&&p| p != 0).count();
+    let proc_other_px = proc_other_seg.iter().filter(|&&p| p != 0).count();
     for (i, &p) in ref_logo.pixels.iter().enumerate() {
         let cnt = usize::from(ref_green[i] != 0)
             + usize::from(ref_blue[i] != 0)
             + usize::from(ref_ball_seg[i] != 0)
             + usize::from(ref_other_seg[i] != 0);
         assert_eq!(cnt, usize::from(p != 0), "logo masks must partition fg");
+    }
+    // Export side-by-side color-coded mask visualization (ref | proc)
+    {
+        let mut m_ppm = format!("P6\n820 230\n255\n").into_bytes();
+        for by in (0..230usize).rev() {
+            for side in 0..2 {
+                let (gr, bl, ba, ot) = if side == 0 {
+                    (&ref_green, &ref_blue, &ref_ball_seg, &ref_other_seg)
+                } else {
+                    (&proc_green, &proc_blue, &proc_ball_seg, &proc_other_seg)
+                };
+                for x in 0..410usize {
+                    let i = by * 410 + x;
+                    let (r, g, b) = if gr[i] != 0 {
+                        (40, 220, 40)
+                    } else if bl[i] != 0 {
+                        (40, 90, 240)
+                    } else if ba[i] != 0 {
+                        (240, 240, 240)
+                    } else if ot[i] != 0 {
+                        (240, 200, 40)
+                    } else {
+                        (0, 0, 0)
+                    };
+                    m_ppm.push(r);
+                    m_ppm.push(g);
+                    m_ppm.push(b);
+                }
+            }
+        }
+        let _ = fs::write(out_dir.join("title_logo_masks.ppm"), m_ppm);
     }
     // Export contour overlay (green = ref edge, red = proc edge, yellow = overlap)
     let logo_edges = |px: &[u32]| -> Vec<bool> {
@@ -728,7 +827,7 @@ fn main() {
         m_logo_w.fg_mae, m_logo_w.iou, m_logo_w.boundary_f1
     );
     println!(
-        "  logo other:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        "  logo other:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4} (ref_px={ref_other_px}, proc_px={proc_other_px})",
         m_logo_o.fg_mae, m_logo_o.iou, m_logo_o.boundary_f1
     );
 
