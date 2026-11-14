@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::pak::{load_pak_file, parse_bmp, BmpImage};
-use crate::procedural::{generate_ball_frames, generate_blobby_frames};
+use crate::procedural::{
+    generate_ball_frames, generate_ball_shadow, generate_blobby_frames, generate_blobby_shadows,
+};
 
 pub const BLOBBY_COLORS: [u32; 8] = [
     0xFF0000, // 0: Red
@@ -162,31 +164,11 @@ impl GameAssets {
         }
         let font_icon_base = font_glyphs[0x33].clone();
 
-        // Blobby shadows (77..=86)
-        let mut blobby_shadows = Vec::with_capacity(10);
-        for entry in &graph[77..=86] {
-            let mut img = parse_bmp(entry)?;
-            for p in &mut img.pixels {
-                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-                if sum < 0x28 {
-                    *p = 0;
-                } else {
-                    *p = (*p & 0x00FCFCFC) >> 1;
-                }
-            }
-            blobby_shadows.push(img);
-        }
+        // Blobby shadows (procedural, 10 frames of 129x25)
+        let blobby_shadows = generate_blobby_shadows(&blobby_base);
 
-        // Ball shadow (87)
-        let mut ball_shadow = parse_bmp(&graph[87])?;
-        for p in &mut ball_shadow.pixels {
-            let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-            if sum < 0x28 {
-                *p = 0;
-            } else {
-                *p = (*p & 0x00FCFCFC) >> 2;
-            }
-        }
+        // Ball shadow (procedural, 69x17)
+        let ball_shadow = generate_ball_shadow();
 
         // Cursor (88), title logo (89), ending splash (90)
         let cursor = parse_bmp(&graph[88])?;

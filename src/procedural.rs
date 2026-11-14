@@ -196,3 +196,68 @@ pub fn generate_blobby_frames() -> Vec<BmpImage> {
     }
     frames
 }
+
+/// Generates the 69x17 checkerboard-dithered ball shadow mask.
+pub fn generate_ball_shadow() -> BmpImage {
+    const W: usize = 69;
+    const H: usize = 17;
+    let mut pixels = vec![0u32; W * H];
+    for by in 0..H {
+        let y = H - 1 - by;
+        let dy = (y as f32 - 8.0) / 8.8;
+        for x in 0..W {
+            if (x + y) % 2 != 1 {
+                continue;
+            }
+            let dx = (x as f32 - 34.0) / 34.8;
+            if dx * dx + dy * dy <= 1.0 {
+                pixels[by * W + x] = 0x00202020;
+            }
+        }
+    }
+    BmpImage {
+        width: W,
+        height: H,
+        pixels,
+    }
+}
+
+/// Generates all 10 checkerboard-dithered Blobby shadow masks (129x25)
+/// from the 5 base Blobby silhouettes (0..5 for P1, 5..10 mirrored for P2).
+pub fn generate_blobby_shadows(blobby_base: &[BmpImage]) -> Vec<BmpImage> {
+    const W: usize = 129;
+    const H: usize = 25;
+    let mut shadows = Vec::with_capacity(10);
+
+    for player in 0..2 {
+        for (k, base) in blobby_base.iter().take(5).enumerate() {
+            let parity = usize::from(k < 2);
+            let mut pixels = vec![0u32; W * H];
+            for by in 0..H {
+                let y = H - 1 - by;
+                let yb_td = 100 - ((24 - y) as f32 * 3.8).round() as i32;
+                if !(0..101).contains(&yb_td) {
+                    continue;
+                }
+                let yb_bu = (base.height as i32 - 1 - yb_td) as usize;
+                for x in 0..W {
+                    let src_x = if player == 0 { x } else { W - 1 - x };
+                    if (src_x + y) % 2 != parity {
+                        continue;
+                    }
+                    let xb = src_x as i32 - 52 + 73;
+                    if (0..148).contains(&xb) && base.pixels[yb_bu * base.width + xb as usize] != 0
+                    {
+                        pixels[by * W + x] = 0x00202020;
+                    }
+                }
+            }
+            shadows.push(BmpImage {
+                width: W,
+                height: H,
+                pixels,
+            });
+        }
+    }
+    shadows
+}

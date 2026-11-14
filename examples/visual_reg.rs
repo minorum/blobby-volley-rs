@@ -2,7 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use blobby_volley_rs::pak::{load_pak_file, parse_bmp, BmpImage};
-use blobby_volley_rs::procedural::{generate_ball_frames, generate_blobby_frames};
+use blobby_volley_rs::procedural::{
+    generate_ball_frames, generate_ball_shadow, generate_blobby_frames, generate_blobby_shadows,
+};
 
 struct Metrics {
     mae: f64,
@@ -145,5 +147,32 @@ fn main() {
         blobby_mae / 5.0,
         blobby_psnr / 5.0,
         blobby_iou / 5.0
+    );
+
+    // 3. Shadows (77..=86 blobby, 87 ball)
+    let proc_bshadows = generate_blobby_shadows(&proc_blobby);
+    let mut bshadow_iou = 0.0;
+    for (k, proc_img) in proc_bshadows.iter().enumerate() {
+        let mut ref_img = parse_bmp(&graph[77 + k]).unwrap();
+        for p in &mut ref_img.pixels {
+            let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+            *p = if sum < 0x28 { 0 } else { 0x00202020 };
+        }
+        let m = compare_images(&ref_img, proc_img);
+        bshadow_iou += m.iou;
+        save_side_by_side(&out_dir.join(format!("bshadow_{k:02}.ppm")), &ref_img, proc_img);
+    }
+    let mut ref_ball_sh = parse_bmp(&graph[87]).unwrap();
+    for p in &mut ref_ball_sh.pixels {
+        let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+        *p = if sum < 0x28 { 0 } else { 0x00202020 };
+    }
+    let proc_ball_sh = generate_ball_shadow();
+    let m_bsh = compare_images(&ref_ball_sh, &proc_ball_sh);
+    save_side_by_side(&out_dir.join("ball_shadow.ppm"), &ref_ball_sh, &proc_ball_sh);
+    println!(
+        "Shadows: blobby mean IoU={:.4}, ball IoU={:.4}",
+        bshadow_iou / 10.0,
+        m_bsh.iou
     );
 }
