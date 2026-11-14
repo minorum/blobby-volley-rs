@@ -872,12 +872,12 @@ pub fn generate_cursor() -> Sprite {
 
 fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
     // Rotate into tilted word coordinates (~15 deg upward-right)
-    let ang = 0.24_f32;
+    let ang = 0.25_f32;
     let (ca, sa) = (ang.cos(), ang.sin());
 
-    // "Blobby" centered around (140, 74), scaled 1.25x
-    let bx = ((px - 140.0) * ca - (py - 74.0) * sa) / 1.25;
-    let by = ((px - 140.0) * sa + (py - 74.0) * ca) / 1.25;
+    // "Blobby" centered around (158, 60), scaled 1.48x
+    let bx = ((px - 158.0) * ca - (py - 60.0) * sa) / 1.48;
+    let by = ((px - 158.0) * sa + (py - 60.0) * ca) / 1.48;
     let blobby_strokes: &[&[(f32, f32)]] = &[
         // B
         &[(-102.0, 26.0), (-92.0, -26.0), (-74.0, -26.0), (-70.0, -14.0), (-80.0, -2.0), (-96.0, -2.0)],
@@ -895,11 +895,11 @@ fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
         // y
         &[(58.0, -2.0), (56.0, 20.0), (70.0, 18.0), (82.0, -2.0), (68.0, 38.0), (50.0, 42.0)],
     ];
-    let d1 = dist_to_polylines(bx, by, blobby_strokes) * 1.25;
+    let d1 = dist_to_polylines(bx, by, blobby_strokes) * 1.48;
 
-    // "Volley" centered around (290, 162), scaled 1.25x
-    let vx = ((px - 290.0) * ca - (py - 162.0) * sa) / 1.25;
-    let vy = ((px - 290.0) * sa + (py - 162.0) * ca) / 1.25;
+    // "Volley" centered around (265, 152), scaled 1.44x
+    let vx = ((px - 265.0) * ca - (py - 152.0) * sa) / 1.44;
+    let vy = ((px - 265.0) * sa + (py - 152.0) * ca) / 1.44;
     let volley_strokes: &[&[(f32, f32)]] = &[
         // V
         &[(-88.0, -26.0), (-74.0, 26.0), (-50.0, -26.0)],
@@ -912,10 +912,10 @@ fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
         // y
         &[(74.0, -2.0), (72.0, 20.0), (86.0, 18.0), (98.0, -2.0), (84.0, 38.0), (66.0, 42.0)],
     ];
-    let d2 = dist_to_polylines(vx, vy, volley_strokes) * 1.25;
+    let d2 = dist_to_polylines(vx, vy, volley_strokes) * 1.44;
 
-    // Miniature volleyball at (256, 165) radius 26
-    let d_ball = ((px - 256.0).powi(2) + (py - 165.0).powi(2)).sqrt() - 26.0;
+    // Miniature volleyball at (240, 160) radius 25.5
+    let d_ball = ((px - 240.0).powi(2) + (py - 160.0).powi(2)).sqrt() - 25.5;
     (d1.min(d2).min(d_ball + 6.0), d_ball <= 0.0)
 }
 
@@ -933,37 +933,40 @@ pub fn generate_title_logo() -> Sprite {
             let (d, in_ball) = title_word_dist(px, py);
 
             if in_ball {
-                // Miniature volleyball inside the 'o' of "Volley"
-                let nx = (px - 256.0) / 26.0;
-                let ny = (165.0 - py) / 26.0;
+                // Miniature volleyball inside the 'o' of "Volley", rotated ~20 deg
+                let nx = (px - 240.0) / 25.5;
+                let ny = (160.0 - py) / 25.5;
                 let nz = (1.0 - nx * nx - ny * ny).max(0.0).sqrt();
                 let ndotl = (nx * -0.40 + ny * 0.85 + nz * 0.34 + 0.4).max(0.0) / 1.4;
                 let shade = 105.0 + 150.0 * ndotl;
-                let seam_d = (ny.abs() - 0.55).abs().min((nx - 0.18).abs()).min((ny - 0.18).abs());
+                let rx = nx * 0.94 - ny * 0.34;
+                let ry = nx * 0.34 + ny * 0.94;
+                let seam_d = (ry.abs() - 0.55).abs().min((rx - 0.18).abs()).min((ry - 0.18).abs());
                 let seam = (-(seam_d / 0.07).powi(2)).exp();
                 let v = (shade * (1.0 - 0.16 * seam)).clamp(40.0, 255.0);
                 pixels[by * W + x] = rgb(v, v, v);
                 continue;
             }
 
-            if d > 19.0 {
+            if d > 22.5 {
                 continue;
             }
-            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 32.0;
-            let bump = (fbm(px * 0.18, py * 0.18, 2) - 0.5) * 40.0;
-            if d <= 4.2 {
-                // Inner bright green letter with dark outline & highlight
-                let edge = ((4.2 - d) / 1.8).clamp(0.0, 1.0);
-                let r = (20.0 + edge * 65.0 + speckle * 0.8).clamp(0.0, 255.0);
-                let g = (145.0 + edge * 100.0 + speckle).clamp(0.0, 255.0);
-                let b = (15.0 + edge * 45.0 + speckle * 0.5).clamp(0.0, 255.0);
+            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 38.0;
+            let bump = (fbm(px * 0.18, py * 0.18, 2) - 0.5) * 42.0;
+            if d <= 5.2 {
+                // Inner bright green letter with dark green outline & speckled highlight
+                let rim = ((5.2 - d) / 2.2).clamp(0.0, 1.0);
+                let hi = ((3.2 - d) / 2.5).clamp(0.0, 1.0) * (speckle.max(0.0) * 1.4);
+                let r = (15.0 + rim * 60.0 + hi + speckle * 0.5).clamp(0.0, 255.0);
+                let g = (105.0 + rim * 135.0 + hi * 0.8 + speckle).clamp(0.0, 255.0);
+                let b = (12.0 + rim * 38.0 + hi * 0.7 + speckle * 0.4).clamp(0.0, 255.0);
                 pixels[by * W + x] = rgb(r, g, b);
             } else {
                 // Outer blue bumpy bubble
-                let t = ((19.0 - d) / 15.0).clamp(0.0, 1.0);
+                let t = ((22.5 - d) / 17.5).clamp(0.0, 1.0);
                 let r = (35.0 + t * 55.0 + bump * 0.6 + speckle * 0.7).clamp(0.0, 255.0);
                 let g = (45.0 + t * 65.0 + bump * 0.7 + speckle * 0.7).clamp(0.0, 255.0);
-                let b = (175.0 + t * 80.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
+                let b = (170.0 + t * 85.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
                 pixels[by * W + x] = rgb(r, g, b);
             }
         }
