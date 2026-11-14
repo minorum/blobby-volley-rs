@@ -1106,16 +1106,8 @@ pub fn generate_ending_splash() -> Sprite {
                 continue;
             }
             let xf = x as f32;
-            // Washed-out beach backdrop (left cliff/palms, central bright sky, right 3 palm crowns, lower sand)
-            let cliff = if xf < 105.0 && yf > 85.0 + xf * 0.12 && yf < 152.0 {
-                (1.0 - ((xf - 80.0) / 25.0).clamp(0.0, 1.0)) * 22.0
-            } else {
-                0.0
-            };
-            let left_palm = {
-                let d = ((xf - 38.0).powi(2) + (yf - 58.0).powi(2)).sqrt();
-                (1.0 - (d / 48.0).clamp(0.0, 1.0)) * 16.0
-            };
+            // Smooth washed-out beach backdrop (left cliff/sand warm shadow, bright central sky, right 3 palm crowns)
+            let cliff = (1.0 - ((xf - 108.0) / 52.0).clamp(0.0, 1.0)) * 20.0;
             let right_palms = {
                 let mut p = 0.0_f32;
                 for &(px, py, pr) in &[(288.0_f32, 106.0_f32, 34.0_f32), (325.0, 90.0, 38.0), (368.0, 100.0, 34.0)] {
@@ -1125,17 +1117,17 @@ pub fn generate_ending_splash() -> Sprite {
                     if d < pr {
                         let ang = dy.atan2(dx);
                         let frond = 0.55 + 0.45 * (ang * 7.0).cos().abs();
-                        p = p.max((1.0 - d / pr) * frond * 16.0);
+                        p = p.max((1.0 - d / pr) * frond * 14.0);
                     }
                 }
                 p
             };
-            let sand_wash = if yf > 168.0 - xf * 0.03 {
-                ((yf - 168.0) / 132.0).clamp(0.0, 1.0) * 10.0
+            let sand_wash = if yf > 175.0 {
+                ((yf - 175.0) / 125.0).clamp(0.0, 1.0) * 6.0
             } else {
                 0.0
             };
-            let base = 229.0 - cliff - left_palm - right_palms - sand_wash;
+            let base = 228.0 - cliff - right_palms - sand_wash;
 
             // Coherent rotated halftone screen matching graph.pak entry 90
             let v1 = (TAU * (0.269 * xf - 0.093 * yf) + 1.7433).cos();
@@ -1155,8 +1147,8 @@ pub fn generate_ending_splash() -> Sprite {
     draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 91.0, 131.0, 22.0, 21.0, 0.22, 0.062, "Daniel Skoraszewsky");
     draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 28.0, 169.0, 21.4, 20.0, 0.22, 0.062, "Grafik von");
     draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 100.0, 207.0, 21.6, 21.0, 0.22, 0.062, "Silvio Mummert");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 263.0, 15.3, 10.5, 0.03, 0.038, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 281.0, 15.7, 10.5, 0.03, 0.038, "www.t-online.de/home/mummertathome/");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 263.0, 15.3, 10.5, 0.03, 0.028, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 281.0, 15.7, 10.5, 0.03, 0.028, "www.t-online.de/home/mummertathome/");
 
     for i in 0..(W * H) {
         if shadow_mask[i] > 0.0 {
