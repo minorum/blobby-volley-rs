@@ -263,8 +263,7 @@ impl RallySim {
         }
 
         // 6. Update players (movement, jump, animation)
-        for i in 0..2 {
-            let p = &mut self.players[i];
+        for (i, p) in self.players.iter_mut().enumerate() {
             if p.input.right {
                 p.x += 12;
                 if i == 0 && p.x > 360 {

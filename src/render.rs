@@ -1,6 +1,13 @@
 use crate::assets::GameAssets;
-use crate::pak::BmpImage;
 use crate::sim::MatchState;
+
+/// 32-bit `0x00RRGGBB` sprite stored bottom-up (row 0 = bottom scanline).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Sprite {
+    pub width: usize,
+    pub height: usize,
+    pub pixels: Vec<u32>,
+}
 
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
@@ -9,6 +16,12 @@ pub const LINE_HEIGHT: i32 = 24; // DAT_0044db50 = 0x18
 
 pub struct Framebuffer {
     pub pixels: Vec<u32>,
+}
+
+impl Default for Framebuffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Framebuffer {
@@ -63,7 +76,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_title_logo(&mut self, logo: &BmpImage, dim_shift: u32) {
+    pub fn draw_title_logo(&mut self, logo: &Sprite, dim_shift: u32) {
         let Some((xs, xe, ys, ye, src_x0, src_y0)) =
             Self::clip_rect_bu(30, 360, logo.width as i32, logo.height as i32)
         else {
@@ -89,7 +102,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_sprite_bu(&mut self, img: &BmpImage, x0: i32, y0: i32) {
+    pub fn draw_sprite_bu(&mut self, img: &Sprite, x0: i32, y0: i32) {
         let Some((xs, xe, ys, ye, src_x0, src_y0)) =
             Self::clip_rect_bu(x0, y0, img.width as i32, img.height as i32)
         else {
@@ -109,7 +122,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_shadow_bu(&mut self, img: &BmpImage, x0: i32, y0: i32) {
+    pub fn draw_shadow_bu(&mut self, img: &Sprite, x0: i32, y0: i32) {
         let Some((xs, xe, ys, ye, src_x0, src_y0)) =
             Self::clip_rect_bu(x0, y0, img.width as i32, img.height as i32)
         else {
@@ -129,7 +142,7 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_cursor(&mut self, cursor: &BmpImage, mx: i32, my_bu: i32) {
+    pub fn draw_cursor(&mut self, cursor: &Sprite, mx: i32, my_bu: i32) {
         self.draw_sprite_bu(cursor, mx, my_bu - 47);
     }
 
@@ -142,46 +155,49 @@ impl Framebuffer {
         highlight: bool,
         text: &str,
     ) {
-        for (i, ch) in text.chars().enumerate() {
-            let cx = x + (i as i32) * CHAR_ADVANCE;
-            let Some((glyph_idx, is_lower)) = char_to_glyph(ch) else {
-                continue;
-            };
-            let glyph = &assets.font_glyphs[glyph_idx];
-            let denom = if is_lower { 4 } else { 3 };
-            for row in 0..24i32 {
-                let gy = (row * 3) / denom + y;
-                if gy < 0 || gy >= HEIGHT as i32 {
+        for (line_idx, line) in text.split('\n').enumerate() {
+            let line_y = y - (line_idx as i32) * LINE_HEIGHT;
+            for (i, ch) in line.chars().enumerate() {
+                let cx = x + (i as i32) * CHAR_ADVANCE;
+                let Some((glyph_idx, is_lower)) = char_to_glyph(ch) else {
                     continue;
-                }
-                let sy = HEIGHT - 1 - gy as usize;
-                let col_start = (-cx).max(0);
-                let col_end = (WIDTH as i32 - cx).min(24);
-                for col in col_start..col_end {
-                    let gx = (cx + col) as usize;
-                    let p = glyph.pixels[(row as usize) * 24 + col as usize];
-                    if (p & 0x00E0E0E0) == 0 {
+                };
+                let glyph = &assets.font_glyphs[glyph_idx];
+                let denom = if is_lower { 4 } else { 3 };
+                for row in 0..24i32 {
+                    let gy = (row * 3) / denom + line_y;
+                    if gy < 0 || gy >= HEIGHT as i32 {
                         continue;
                     }
-                    let out = if !small {
-                        if highlight {
-                            let r = (((p >> 16) & 0xFF) * 2 + 0x1E).min(255);
-                            let g = (((p >> 8) & 0xFF) * 2 + 0x1E).min(255);
-                            let b = ((p & 0xFF) * 2 + 0x1E).min(255);
-                            (r << 16) | (g << 8) | b
-                        } else {
-                            p
+                    let sy = HEIGHT - 1 - gy as usize;
+                    let col_start = (-cx).max(0);
+                    let col_end = (WIDTH as i32 - cx).min(24);
+                    for col in col_start..col_end {
+                        let gx = (cx + col) as usize;
+                        let p = glyph.pixels[(row as usize) * 24 + col as usize];
+                        if (p & 0x00E0E0E0) == 0 {
+                            continue;
                         }
-                    } else {
-                        let b = p & 0xFF;
-                        let g = (p >> 8) & 0xFF;
-                        let r = (p >> 16) & 0xFF;
-                        let lum = ((b * 3 + g * 6 + r) / 10) >> 1;
-                        let base = if highlight { 0xBF } else { 0x7F };
-                        let v = (base - lum as i32).clamp(0, 255) as u32;
-                        (v << 16) | (v << 8) | v
-                    };
-                    self.pixels[sy * WIDTH + gx] = out;
+                        let out = if !small {
+                            if highlight {
+                                let r = (((p >> 16) & 0xFF) * 2 + 0x1E).min(255);
+                                let g = (((p >> 8) & 0xFF) * 2 + 0x1E).min(255);
+                                let b = ((p & 0xFF) * 2 + 0x1E).min(255);
+                                (r << 16) | (g << 8) | b
+                            } else {
+                                p
+                            }
+                        } else {
+                            let b = p & 0xFF;
+                            let g = (p >> 8) & 0xFF;
+                            let r = (p >> 16) & 0xFF;
+                            let lum = ((b * 3 + g * 6 + r) / 10) >> 1;
+                            let base = if highlight { 0xBF } else { 0x7F };
+                            let v = (base - lum as i32).clamp(0, 255) as u32;
+                            (v << 16) | (v << 8) | v
+                        };
+                        self.pixels[sy * WIDTH + gx] = out;
+                    }
                 }
             }
         }
@@ -198,8 +214,7 @@ impl Framebuffer {
 
         let r = &m.rally;
         // Player shadows
-        for i in 0..2 {
-            let p = &r.players[i];
+        for (i, p) in r.players.iter().enumerate() {
             let sx = (p.x + ((p.y - 100) >> 2) + 24 - (i as i32) * 24) & !1;
             let sy = ((p.y - 100) >> 3) + 97;
             let frame = (p.anim_frame.clamp(0, 4) as usize) + i * 5;
@@ -271,8 +286,7 @@ impl Framebuffer {
         self.draw_sprite_bu(&assets.ball_frames[ball_frame], bx_px - 32, by_px - 32);
 
         // Players
-        for i in 0..2 {
-            let p = &r.players[i];
+        for (i, p) in r.players.iter().enumerate() {
             let frame = p.anim_frame.clamp(0, 4) as usize;
             self.draw_sprite_bu(&assets.blobby_colored[i][frame], p.x - 74, p.y);
         }
@@ -328,7 +342,7 @@ mod tests {
         // Outside rect stays unchanged
         assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH + 10], 0x00808080);
 
-        let img = BmpImage {
+        let img = Sprite {
             width: 4,
             height: 4,
             pixels: vec![0x00FF0000; 16],
@@ -336,6 +350,21 @@ mod tests {
         fb.draw_sprite_bu(&img, -2, -2);
         assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH], 0x00FF0000);
         assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH + 2], 0x00404040);
+    }
+
+    #[test]
+    fn draw_text_splits_newlines_across_vertical_lines() {
+        let assets = GameAssets::generate();
+        let mut fb = Framebuffer::new();
+        fb.draw_text(&assets, 100, 300, false, false, "A\nB");
+        // Line 0 ('A') renders near y_bu = 300..324 (sy = 276..299); Line 1 ('B') near y_bu = 276..300 (sy = 300..323)
+        let top_line_lit = (276..300).any(|sy| (100..124).any(|x| fb.pixels[sy * WIDTH + x] != 0));
+        let bot_line_lit = (300..324).any(|sy| (100..124).any(|x| fb.pixels[sy * WIDTH + x] != 0));
+        // Nothing should be drawn at x >= 120 on line 0 (i.e. no '\\n' characters concatenated horizontally)
+        let trailing_lit = (276..300).any(|sy| (124..180).any(|x| fb.pixels[sy * WIDTH + x] != 0));
+        assert!(top_line_lit);
+        assert!(bot_line_lit);
+        assert!(!trailing_lit);
     }
 
     #[test]

@@ -210,6 +210,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires original/*.pak reference assets"]
     fn unpack_all_original_paks() {
         let graph = load_pak_file(&orig_path("graph.pak")).unwrap();
         assert_eq!(graph.len(), 93);

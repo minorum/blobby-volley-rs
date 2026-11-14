@@ -1,9 +1,13 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::pak::{load_pak_file, parse_bmp, BmpImage};
+use crate::procedural::{
+    generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
+    generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
+    generate_hit_wav, generate_title_logo, generate_whistle_wav,
+};
+use crate::render::Sprite;
 
 pub const BLOBBY_COLORS: [u32; 8] = [
     0xFF0000, // 0: Red
@@ -38,22 +42,313 @@ pub struct LocalizedText {
 }
 
 impl LocalizedText {
-    pub fn parse(raw: &[u8]) -> Self {
-        // Text files in text.pak are Windows-1252 / ISO-8859-1 encoded with CRLF.
-        let text: String = raw.iter().map(|&b| b as char).collect();
-        let mut sections: HashMap<String, Vec<String>> = HashMap::new();
-        let mut current = String::new();
-        for line in text.lines() {
-            let line = line.trim_end_matches('\r');
-            if line.starts_with('@') {
-                current = line.to_string();
-                sections.entry(current.clone()).or_default();
-            } else if !current.is_empty() {
-                sections
-                    .entry(current.clone())
-                    .or_default()
-                    .push(line.to_string());
-            }
+    pub fn french() -> Self {
+        Self::from_pairs(&[
+            (
+                "@main",
+                &[
+                    "Jouer",
+                    "Jeu en reseau",
+                    "Statistiques",
+                    "Reglages",
+                    "Deutsch",
+                    "Fin",
+                ],
+            ),
+            (
+                "@settings",
+                &[
+                    "< Joueur 1",
+                    "> Joueur 2",
+                    "Nom:",
+                    "Controle:",
+                    "definir Touches ...",
+                    "Son:",
+                    "Ok",
+                    "Clavier",
+                    "Souris",
+                    "Comp.(facile)",
+                    "Comp.(moyen)",
+                    "Comp.(difficile)",
+                    "marche",
+                    "arret",
+                ],
+            ),
+            (
+                "@keydef",
+                &[
+                    "Joueur 1 (Host)",
+                    "Joueur 2 (invite)",
+                    " gauche",
+                    " droite",
+                    " Saut",
+                ],
+            ),
+            ("@win", &["gagne"]),
+            ("@nachfrage", &["Vraiment\nquitter\nle jeu?"]),
+            ("@names", &["Adam", "Bert", "Carl"]),
+            (
+                "@stats",
+                &[
+                    "Nom",
+                    "Jr.",
+                    "ga.",
+                    "Points",
+                    "²",
+                    "³",
+                    "Ok",
+                    "Jeu contre joueur",
+                    "Jeu contre Adam (facile)",
+                    "Jeu contre Bert (moyen)",
+                    "Jeu contre Carl (difficile)",
+                    "Tout les jeux",
+                ],
+            ),
+            (
+                "@mpsettings",
+                &[
+                    "Options-Multijoueur",
+                    "Jouer reseau...",
+                    "Jouer INVITE...",
+                    "retour",
+                ],
+            ),
+            (
+                "@hostsettings",
+                &[
+                    "Reglages serveur",
+                    "Nom du jeu:",
+                    "controles:",
+                    "jouer!",
+                    "retour",
+                ],
+            ),
+            (
+                "@clientsettings",
+                &[
+                    "reglages invite",
+                    "Host-IP:",
+                    "controles:",
+                    "Chercher jeux",
+                    "retour",
+                ],
+            ),
+            (
+                "@clientgamelist",
+                &["jeux trouves:", "retour", "pas de jeux trouves"],
+            ),
+            ("@hostwaiting", &["attente invite...", "(Annuler avec ESC)"]),
+        ])
+    }
+
+    pub fn german() -> Self {
+        Self::from_pairs(&[
+            (
+                "@main",
+                &[
+                    "Spiel starten",
+                    "Netzwerkspiel",
+                    "Statistik",
+                    "Einstellungen",
+                    "English Please",
+                    "Ende",
+                ],
+            ),
+            (
+                "@settings",
+                &[
+                    "< Spieler 1",
+                    "> Spieler 2",
+                    "Name:",
+                    "Steuerung:",
+                    "Tasten definieren...",
+                    "Sound:",
+                    "Ok",
+                    "Tastatur",
+                    "Maus",
+                    "Comp.(leicht)",
+                    "Comp.(mittel)",
+                    "Comp.(schwer)",
+                    "an",
+                    "aus",
+                ],
+            ),
+            (
+                "@keydef",
+                &[
+                    "Spieler 1 (Host)",
+                    "Spieler 2 (Gast)",
+                    " links",
+                    " rechts",
+                    " Sprung",
+                ],
+            ),
+            ("@win", &["gewinnt"]),
+            ("@nachfrage", &["Spiel\nwirklich\nbeenden?"]),
+            ("@names", &["Adam", "Bert", "Carl"]),
+            (
+                "@stats",
+                &[
+                    "Name",
+                    "Sp.",
+                    "gew.",
+                    "Punkte",
+                    "²",
+                    "³",
+                    "Ok",
+                    "Spiele gegen Menschen",
+                    "Spiele gegen Adam (leicht)",
+                    "Spiele gegen Bert (mittel)",
+                    "Spiele gegen Carl (schwer)",
+                    "alle Spiele",
+                ],
+            ),
+            (
+                "@mpsettings",
+                &[
+                    "Multiplayer-Optionen",
+                    "Ein Spiel hosten...",
+                    "Als Gast spielen...",
+                    "zurück",
+                ],
+            ),
+            (
+                "@hostsettings",
+                &[
+                    "Host-Einstellungen",
+                    "Name des Spiels:",
+                    "Steuerung:",
+                    "Spiel beginnen!",
+                    "Zurück",
+                ],
+            ),
+            (
+                "@clientsettings",
+                &[
+                    "Gast-Einstellungen",
+                    "Host-IP:",
+                    "Steuerung:",
+                    "Spiele suchen",
+                    "Zurück",
+                ],
+            ),
+            (
+                "@clientgamelist",
+                &["Gefundene Spiele:", "zurück", "keine Spiele gefunden"],
+            ),
+            (
+                "@hostwaiting",
+                &["Warte auf einen Gast...", "(Abbruch mit ESC)"],
+            ),
+        ])
+    }
+
+    pub fn english() -> Self {
+        Self::from_pairs(&[
+            (
+                "@main",
+                &[
+                    "Start Game",
+                    "Network Match",
+                    "Statistics",
+                    "Settings",
+                    "Francais",
+                    "Quit",
+                ],
+            ),
+            (
+                "@settings",
+                &[
+                    "< Player 1",
+                    "> Player 2",
+                    "Name:",
+                    "Control:",
+                    "Define keys...",
+                    "Sound:",
+                    "Ok",
+                    "Keyboard",
+                    "Mouse",
+                    "Comp.(easy)",
+                    "Comp.(avg.)",
+                    "Comp.(hard)",
+                    "on",
+                    "off",
+                ],
+            ),
+            (
+                "@keydef",
+                &[
+                    "Player 1 (host)",
+                    "Player 2 (client)",
+                    " left",
+                    " right",
+                    " jump",
+                ],
+            ),
+            ("@win", &["wins"]),
+            ("@nachfrage", &["Really quit?"]),
+            ("@names", &["Adam", "Bert", "Carl"]),
+            (
+                "@stats",
+                &[
+                    "name",
+                    "gms",
+                    "won",
+                    "score",
+                    "²",
+                    "³",
+                    "ok",
+                    "matches against humans",
+                    "matches against Adam (easy)",
+                    "matches against Bert (avg.)",
+                    "matches against Carl (hard)",
+                    "all matches",
+                ],
+            ),
+            (
+                "@mpsettings",
+                &[
+                    "Multiplayer Options",
+                    "Host a game...",
+                    "Join a game...",
+                    "Back",
+                ],
+            ),
+            (
+                "@hostsettings",
+                &[
+                    "Host Settings",
+                    "Game name:",
+                    "Control:",
+                    "Start Hosting!",
+                    "Back",
+                ],
+            ),
+            (
+                "@clientsettings",
+                &[
+                    "Client Settings",
+                    "Host-IP:",
+                    "Control:",
+                    "Find Sessions",
+                    "Back",
+                ],
+            ),
+            (
+                "@clientgamelist",
+                &["sessions found:", "back", "no sessions found."],
+            ),
+            (
+                "@hostwaiting",
+                &["Waiting for Client... ", "(press ESC to cancel)"],
+            ),
+        ])
+    }
+
+    fn from_pairs(pairs: &[(&str, &[&str])]) -> Self {
+        let mut sections = HashMap::new();
+        for &(k, vals) in pairs {
+            sections.insert(k.to_string(), vals.iter().map(|&s| s.to_string()).collect());
         }
         Self { sections }
     }
@@ -68,33 +363,33 @@ impl LocalizedText {
 }
 
 pub struct GameAssets {
-    pub bg: Vec<u32>,                       // 800x600 top-down (matches Framebuffer)
-    pub bg_dark: Vec<u32>,                  // 800x600 top-down (1/8 brightness for menus)
-    pub ball_frames: Vec<BmpImage>,         // 16 frames of 64x64
-    pub blobby_base: Vec<BmpImage>,         // 5 frames of 148x101 (grayscale base)
-    pub blobby_colored: [Vec<BmpImage>; 2], // 5 frames per player
-    pub font_glyphs: Vec<BmpImage>,         // 55 glyphs of 24x24
-    pub font_icon_base: BmpImage,           // base glyph 51 (0x33) for player color icons
-    pub blobby_shadows: Vec<BmpImage>,      // 10 frames of 129x25 (actually 5 mirrored/frames)
-    pub ball_shadow: BmpImage,              // 69x17
-    pub cursor: BmpImage,                   // 48x48
-    pub title_logo: BmpImage,               // entry 89 (410x230)
-    pub ending_splash: BmpImage,            // entry 90 (400x300)
-    pub sounds: [Arc<[u8]>; 2],             // 0: whistle, 1: hit/menu click
-    pub texts: [LocalizedText; 3],          // 0: FR, 1: DE, 2: EN
+    pub bg: Vec<u32>,                     // 800x600 top-down (matches Framebuffer)
+    pub bg_dark: Vec<u32>,                // 800x600 top-down (1/8 brightness for menus)
+    pub ball_frames: Vec<Sprite>,         // 16 frames of 64x64
+    pub blobby_base: Vec<Sprite>,         // 5 frames of 148x101 (grayscale base)
+    pub blobby_colored: [Vec<Sprite>; 2], // 5 frames per player
+    pub font_glyphs: Vec<Sprite>,         // 55 glyphs of 24x24
+    pub font_icon_base: Sprite,           // base glyph 51 (0x33) for player color icons
+    pub blobby_shadows: Vec<Sprite>,      // 10 frames of 129x25 (actually 5 mirrored/frames)
+    pub ball_shadow: Sprite,              // 69x17
+    pub cursor: Sprite,                   // 48x48
+    pub title_logo: Sprite,               // entry 89 (410x230)
+    pub ending_splash: Sprite,            // entry 90 (400x300)
+    pub sounds: [Arc<[u8]>; 2],           // 0: whistle, 1: hit/menu click
+    pub texts: [LocalizedText; 3],        // 0: FR, 1: DE, 2: EN
 }
 
-pub fn find_asset_dir() -> PathBuf {
+pub fn find_settings_dir() -> PathBuf {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    if cwd.join("graph.pak").exists() {
+    if cwd.join("bv_settings.txt").exists() {
         return cwd;
     }
     let orig = cwd.join("original");
-    if orig.join("graph.pak").exists() {
+    if orig.join("bv_settings.txt").exists() {
         return orig;
     }
     let manifest_orig = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("original");
-    if manifest_orig.join("graph.pak").exists() {
+    if manifest_orig.join("bv_settings.txt").exists() {
         return manifest_orig;
     }
     cwd
@@ -115,117 +410,30 @@ pub fn tint_pixel(color: u32, pixel: u32) -> u32 {
 }
 
 impl GameAssets {
-    pub fn load(dir: &Path) -> Result<Self, String> {
-        let graph = load_pak_file(&dir.join("graph.pak"))?;
-        if graph.len() < 91 {
-            return Err(format!("Unexpected graph.pak entry count: {}", graph.len()));
-        }
-
-        // Background (with optional bvbg.bmp override if 800x600)
-        let mut bg_img = parse_bmp(&graph[0])?;
-        let bvbg_path = dir.join("bvbg.bmp");
-        if bvbg_path.exists() {
-            if let Ok(bytes) = fs::read(&bvbg_path) {
-                if let Ok(custom) = parse_bmp(&bytes) {
-                    if custom.width == 800 && custom.height == 600 {
-                        bg_img = custom;
-                    }
-                }
-            }
-        }
-        // Flip background to top-down once so per-frame copy_bg is a single memcpy.
-        let mut bg = vec![0u32; 800 * 600];
-        for y in 0..600 {
-            bg[(599 - y) * 800..(600 - y) * 800]
-                .copy_from_slice(&bg_img.pixels[y * 800..(y + 1) * 800]);
-        }
+    /// Generates all game graphics, audio, and localization tables procedurally
+    /// with zero runtime dependency on external `.pak` files.
+    pub fn generate() -> Self {
+        let bg = generate_background();
         let bg_dark: Vec<u32> = bg.iter().map(|&p| (p & 0x00F8F8F8) >> 3).collect();
-
-        // Ball frames (1..=16)
-        let mut ball_frames = Vec::with_capacity(16);
-        for entry in &graph[1..=16] {
-            let mut img = parse_bmp(entry)?;
-            for p in &mut img.pixels {
-                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-                if sum < 0xB4 {
-                    *p = 0;
-                } else if *p == 0 {
-                    *p = 1;
-                }
-            }
-            ball_frames.push(img);
-        }
-
-        // Blobby base frames (17..=21)
-        let mut blobby_base = Vec::with_capacity(5);
-        for entry in &graph[17..=21] {
-            blobby_base.push(parse_bmp(entry)?);
-        }
-
-        // Font glyphs (22..=76)
-        let mut font_glyphs = Vec::with_capacity(55);
-        for entry in &graph[22..=76] {
-            let mut img = parse_bmp(entry)?;
-            for p in &mut img.pixels {
-                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-                if sum < 0x28 {
-                    *p = 0;
-                }
-            }
-            font_glyphs.push(img);
-        }
+        let ball_frames = generate_ball_frames();
+        let blobby_base = generate_blobby_frames();
+        let font_glyphs = generate_font_glyphs(&blobby_base[0]);
         let font_icon_base = font_glyphs[0x33].clone();
+        let blobby_shadows = generate_blobby_shadows(&blobby_base);
+        let ball_shadow = generate_ball_shadow();
+        let cursor = generate_cursor();
+        let title_logo = generate_title_logo();
+        let ending_splash = generate_ending_splash();
 
-        // Blobby shadows (77..=86)
-        let mut blobby_shadows = Vec::with_capacity(10);
-        for entry in &graph[77..=86] {
-            let mut img = parse_bmp(entry)?;
-            for p in &mut img.pixels {
-                let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-                if sum < 0x28 {
-                    *p = 0;
-                } else {
-                    *p = (*p & 0x00FCFCFC) >> 1;
-                }
-            }
-            blobby_shadows.push(img);
-        }
-
-        // Ball shadow (87)
-        let mut ball_shadow = parse_bmp(&graph[87])?;
-        for p in &mut ball_shadow.pixels {
-            let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-            if sum < 0x28 {
-                *p = 0;
-            } else {
-                *p = (*p & 0x00FCFCFC) >> 2;
-            }
-        }
-
-        // Cursor (88), title logo (89), ending splash (90)
-        let cursor = parse_bmp(&graph[88])?;
-        let title_logo = parse_bmp(&graph[89])?;
-        let ending_splash = parse_bmp(&graph[90])?;
-
-        // Sounds
-        let sound_entries = load_pak_file(&dir.join("sound.pak"))?;
-        if sound_entries.len() < 2 {
-            return Err("sound.pak has fewer than 2 entries".to_string());
-        }
         let sounds = [
-            Arc::from(sound_entries[0].as_slice()),
-            Arc::from(sound_entries[1].as_slice()),
+            Arc::from(generate_whistle_wav().into_boxed_slice()),
+            Arc::from(generate_hit_wav().into_boxed_slice()),
         ];
 
-        // Texts
-        let text_entries = load_pak_file(&dir.join("text.pak"))?;
-        if text_entries.len() < 3 {
-            return Err("text.pak has fewer than 3 entries".to_string());
-        }
         let texts = [
-            LocalizedText::parse(&text_entries[0]),
-            LocalizedText::parse(&text_entries[1]),
-            LocalizedText::parse(&text_entries[2]),
+            LocalizedText::french(),
+            LocalizedText::german(),
+            LocalizedText::english(),
         ];
 
         let mut assets = Self {
@@ -246,7 +454,7 @@ impl GameAssets {
         };
         assets.recolor_player(0, 0);
         assets.recolor_player(1, 3);
-        Ok(assets)
+        assets
     }
 
     pub fn recolor_player(&mut self, player_idx: usize, color_idx: usize) {
@@ -285,13 +493,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn localized_text_parses_sections_and_crlf() {
-        let raw = b"@main\r\nStart\r\nQuit\r\n@names\r\nAdam\r\n";
-        let lt = LocalizedText::parse(raw);
-        assert_eq!(lt.get("@main", 0), "Start");
-        assert_eq!(lt.get("@main", 1), "Quit");
-        assert_eq!(lt.get("@names", 0), "Adam");
-        assert_eq!(lt.get("@missing", 0), "");
+    fn localized_text_tables_have_expected_entries() {
+        let fr = LocalizedText::french();
+        let de = LocalizedText::german();
+        let en = LocalizedText::english();
+        assert_eq!(fr.get("@main", 0), "Jouer");
+        assert_eq!(de.get("@main", 0), "Spiel starten");
+        assert_eq!(en.get("@main", 0), "Start Game");
+        assert_eq!(en.get("@names", 0), "Adam");
+        assert_eq!(en.get("@missing", 0), "");
+        assert!(!fr.get("@nachfrage", 0).contains("\\n"));
+        assert!(!de.get("@nachfrage", 0).contains("\\n"));
+        assert_eq!(fr.get("@nachfrage", 0).lines().count(), 3);
+        assert_eq!(de.get("@nachfrage", 0).lines().count(), 3);
+    }
+
+    #[test]
+    fn game_assets_generate_is_deterministic_and_valid() {
+        let a = GameAssets::generate();
+        let b = GameAssets::generate();
+        assert_eq!(a.bg.len(), 800 * 600);
+        assert_eq!(a.bg, b.bg);
+        assert_eq!(a.ball_frames.len(), 16);
+        assert_eq!((a.ball_frames[0].width, a.ball_frames[0].height), (64, 64));
+        assert_eq!(a.ball_frames, b.ball_frames);
+        assert_eq!(a.blobby_base.len(), 5);
+        assert_eq!(
+            (a.blobby_base[0].width, a.blobby_base[0].height),
+            (148, 101)
+        );
+        assert_eq!(a.blobby_shadows.len(), 10);
+        assert_eq!((a.ball_shadow.width, a.ball_shadow.height), (69, 17));
+        assert_eq!(a.font_glyphs.len(), 55);
+        assert_eq!((a.cursor.width, a.cursor.height), (48, 48));
+        assert_eq!((a.title_logo.width, a.title_logo.height), (410, 230));
+        assert_eq!((a.ending_splash.width, a.ending_splash.height), (400, 300));
+        assert_eq!(&a.sounds[0][0..4], b"RIFF");
+        assert_eq!(&a.sounds[1][0..4], b"RIFF");
     }
 
     #[test]
