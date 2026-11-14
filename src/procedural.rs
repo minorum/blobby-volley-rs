@@ -866,13 +866,13 @@ pub fn generate_cursor() -> Sprite {
 }
 
 fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
-    // Rotate into tilted word coordinates (~15 deg upward-right)
-    let ang = 0.25_f32;
+    // Rotate into tilted word coordinates (~17 deg upward-right)
+    let ang = 0.30_f32;
     let (ca, sa) = (ang.cos(), ang.sin());
 
-    // "Blobby" centered around (158, 60), scaled 1.48x
-    let bx = ((px - 158.0) * ca - (py - 60.0) * sa) / 1.48;
-    let by = ((px - 158.0) * sa + (py - 60.0) * ca) / 1.48;
+    // "Blobby" centered around (148, 64), scaled 1.44x
+    let bx = ((px - 148.0) * ca - (py - 64.0) * sa) / 1.44;
+    let by = ((px - 148.0) * sa + (py - 64.0) * ca) / 1.44;
     let blobby_strokes: &[&[(f32, f32)]] = &[
         // B
         &[(-102.0, 26.0), (-92.0, -26.0), (-74.0, -26.0), (-70.0, -14.0), (-80.0, -2.0), (-96.0, -2.0)],
@@ -890,24 +890,24 @@ fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
         // y
         &[(58.0, -2.0), (56.0, 20.0), (70.0, 18.0), (82.0, -2.0), (68.0, 38.0), (50.0, 42.0)],
     ];
-    let d1 = dist_to_polylines(bx, by, blobby_strokes) * 1.48;
+    let d1 = dist_to_polylines(bx, by, blobby_strokes) * 1.44;
 
-    // "Volley" centered around (265, 152), scaled 1.44x
-    let vx = ((px - 265.0) * ca - (py - 152.0) * sa) / 1.44;
-    let vy = ((px - 265.0) * sa + (py - 152.0) * ca) / 1.44;
+    // "Volley" centered around (280, 154), scaled 1.38x
+    let vx = ((px - 280.0) * ca - (py - 154.0) * sa) / 1.38;
+    let vy = ((px - 280.0) * sa + (py - 154.0) * ca) / 1.38;
     let volley_strokes: &[&[(f32, f32)]] = &[
         // V
-        &[(-88.0, -26.0), (-74.0, 26.0), (-50.0, -26.0)],
+        &[(-80.0, -26.0), (-66.0, 26.0), (-44.0, -26.0)],
         // l1
         &[(2.0, -28.0), (-8.0, 26.0)],
         // l2
-        &[(24.0, -28.0), (14.0, 26.0)],
+        &[(22.0, -28.0), (12.0, 26.0)],
         // e
-        &[(38.0, 12.0), (56.0, 8.0), (58.0, -2.0), (44.0, -4.0), (34.0, 10.0), (38.0, 24.0), (54.0, 24.0)],
+        &[(36.0, 12.0), (54.0, 8.0), (56.0, -2.0), (42.0, -4.0), (32.0, 10.0), (36.0, 24.0), (52.0, 24.0)],
         // y
-        &[(74.0, -2.0), (72.0, 20.0), (86.0, 18.0), (98.0, -2.0), (84.0, 38.0), (66.0, 42.0)],
+        &[(72.0, -2.0), (70.0, 20.0), (84.0, 18.0), (96.0, -2.0), (82.0, 38.0), (64.0, 42.0)],
     ];
-    let d2 = dist_to_polylines(vx, vy, volley_strokes) * 1.44;
+    let d2 = dist_to_polylines(vx, vy, volley_strokes) * 1.38;
 
     // Miniature volleyball at (240, 160) radius 25.5
     let d_ball = ((px - 240.0).powi(2) + (py - 160.0).powi(2)).sqrt() - 25.5;
@@ -946,8 +946,8 @@ pub fn generate_title_logo() -> Sprite {
             if d > 22.5 {
                 continue;
             }
-            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 38.0;
-            let bump = (fbm(px * 0.18, py * 0.18, 2) - 0.5) * 42.0;
+            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 14.0;
+            let bump = (fbm(px * 0.14, py * 0.14, 2) - 0.5) * 28.0;
             if d <= 5.2 {
                 // Inner bright green letter with dark green outline & speckled highlight
                 let rim = ((5.2 - d) / 2.2).clamp(0.0, 1.0);
@@ -1193,7 +1193,7 @@ pub fn generate_whistle_wav() -> Vec<u8> {
 pub fn generate_hit_wav() -> Vec<u8> {
     const SR: u32 = 44100;
     const N: usize = 2408;
-    const HIT_START: f32 = 0.00105;
+    const HIT_START: f32 = 46.0 / SR as f32;
     let mut samples = Vec::with_capacity(N);
     for i in 0..N {
         let t = i as f32 / SR as f32;
@@ -1202,14 +1202,12 @@ pub fn generate_hit_wav() -> Vec<u8> {
                 * (std::f32::consts::PI * t / HIT_START).sin()
         } else {
             let th = t - HIT_START;
-            let gate = (th / 0.00045).min(1.0);
-            let thump = 62.0 * (th * 95.0 * std::f32::consts::TAU + 0.4).sin() * (-th * 50.0).exp()
-                + 54.0 * (th * 186.0 * std::f32::consts::TAU + 2.2).sin() * (-th * 82.0).exp();
-            let snap = (36.0 * (th * 2350.0 * std::f32::consts::TAU).sin()
-                + 24.0 * (th * 2740.0 * std::f32::consts::TAU + 1.0).sin())
-                * (-th * 300.0).exp();
-            let noise = symmetric_noise(i as i32) * 16.0 * (-th * 130.0).exp();
-            gate * (thump + snap + noise)
+            let thump = 35.0 * (th * 95.0 * std::f32::consts::TAU + 2.807).sin() * (-th * 50.0).exp()
+                + 22.5 * (th * 186.0 * std::f32::consts::TAU - 1.487).sin() * (-th * 82.0).exp();
+            let snap = 71.0 * (th * 2350.0 * std::f32::consts::TAU - 2.077).sin() * (-th * 260.0).exp()
+                + 40.0 * (th * 2740.0 * std::f32::consts::TAU + 1.119).sin() * (-th * 280.0).exp();
+            let noise = symmetric_noise(i as i32) * 14.0 * (-th * 130.0).exp();
+            thump + snap + noise
         };
         samples.push((128.0 + val.clamp(-128.0, 127.0)).round().clamp(0.0, 255.0) as u8);
     }

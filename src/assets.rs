@@ -48,7 +48,7 @@ impl LocalizedText {
             ("@settings", &["< Joueur 1", "> Joueur 2", "Nom:", "Controle:", "definir Touches ...", "Son:", "Ok", "Clavier", "Souris", "Comp.(facile)", "Comp.(moyen)", "Comp.(difficile)", "marche", "arret"]),
             ("@keydef", &["Joueur 1 (Host)", "Joueur 2 (invite)", " gauche", " droite", " Saut"]),
             ("@win", &["gagne"]),
-            ("@nachfrage", &["Vraiment\\nquitter\\nle jeu?"]),
+            ("@nachfrage", &["Vraiment\nquitter\nle jeu?"]),
             ("@names", &["Adam", "Bert", "Carl"]),
             ("@stats", &["Nom", "Jr.", "ga.", "Points", "²", "³", "Ok", "Jeu contre joueur", "Jeu contre Adam (facile)", "Jeu contre Bert (moyen)", "Jeu contre Carl (difficile)", "Tout les jeux"]),
             ("@mpsettings", &["Options-Multijoueur", "Jouer reseau...", "Jouer INVITE...", "retour"]),
@@ -65,7 +65,7 @@ impl LocalizedText {
             ("@settings", &["< Spieler 1", "> Spieler 2", "Name:", "Steuerung:", "Tasten definieren...", "Sound:", "Ok", "Tastatur", "Maus", "Comp.(leicht)", "Comp.(mittel)", "Comp.(schwer)", "an", "aus"]),
             ("@keydef", &["Spieler 1 (Host)", "Spieler 2 (Gast)", " links", " rechts", " Sprung"]),
             ("@win", &["gewinnt"]),
-            ("@nachfrage", &["Spiel\\nwirklich\\nbeenden?"]),
+            ("@nachfrage", &["Spiel\nwirklich\nbeenden?"]),
             ("@names", &["Adam", "Bert", "Carl"]),
             ("@stats", &["Name", "Sp.", "gew.", "Punkte", "²", "³", "Ok", "Spiele gegen Menschen", "Spiele gegen Adam (leicht)", "Spiele gegen Bert (mittel)", "Spiele gegen Carl (schwer)", "alle Spiele"]),
             ("@mpsettings", &["Multiplayer-Optionen", "Ein Spiel hosten...", "Als Gast spielen...", "zurück"]),
@@ -253,6 +253,10 @@ mod tests {
         assert_eq!(en.get("@main", 0), "Start Game");
         assert_eq!(en.get("@names", 0), "Adam");
         assert_eq!(en.get("@missing", 0), "");
+        assert!(!fr.get("@nachfrage", 0).contains("\\n"));
+        assert!(!de.get("@nachfrage", 0).contains("\\n"));
+        assert_eq!(fr.get("@nachfrage", 0).lines().count(), 3);
+        assert_eq!(de.get("@nachfrage", 0).lines().count(), 3);
     }
 
     #[test]

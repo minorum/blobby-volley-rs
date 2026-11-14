@@ -301,15 +301,26 @@ fn parse_wav(wav: &[u8]) -> Result<WavData, String> {
     if wav.len() < 12 || &wav[0..4] != b"RIFF" || &wav[8..12] != b"WAVE" {
         return Err("Not a RIFF/WAVE file".to_string());
     }
+    let riff_sz = u32::from_le_bytes(wav[4..8].try_into().unwrap()) as usize;
+    let riff_end = 8usize.checked_add(riff_sz).ok_or("RIFF size overflow")?;
+    if riff_end > wav.len() {
+        return Err("Truncated RIFF container".to_string());
+    }
     let mut pos = 12usize;
     let mut fmt: Option<(u16, u16, u32, u16)> = None;
     let mut data_bytes: Option<&[u8]> = None;
-    while pos + 8 <= wav.len() {
+    while pos + 8 <= riff_end {
         let id = &wav[pos..pos + 4];
         let sz = u32::from_le_bytes(wav[pos + 4..pos + 8].try_into().unwrap()) as usize;
         let body_start = pos + 8;
-        let body_end = body_start.saturating_add(sz).min(wav.len());
-        if id == b"fmt " && sz >= 16 {
+        let body_end = body_start.checked_add(sz).ok_or("Chunk size overflow")?;
+        if body_end > riff_end {
+            return Err("Truncated WAV chunk".to_string());
+        }
+        if id == b"fmt " {
+            if sz < 16 || body_end < body_start + 16 {
+                return Err("Truncated fmt chunk".to_string());
+            }
             let audio_fmt = u16::from_le_bytes([wav[body_start], wav[body_start + 1]]);
             let channels = u16::from_le_bytes([wav[body_start + 2], wav[body_start + 3]]);
             let sr = u32::from_le_bytes(wav[body_start + 4..body_start + 8].try_into().unwrap());
@@ -318,7 +329,7 @@ fn parse_wav(wav: &[u8]) -> Result<WavData, String> {
         } else if id == b"data" {
             data_bytes = Some(&wav[body_start..body_end]);
         }
-        pos = body_start + sz + (sz & 1);
+        pos = body_end.saturating_add(sz & 1);
     }
     let (audio_fmt, channels, sample_rate, bits_per_sample) =
         fmt.ok_or_else(|| "Missing fmt chunk".to_string())?;
@@ -382,36 +393,67 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
         best_wave_corr = best_wave_corr.max(pearson_corr(rs, ps));
     }
 
-    // 64-bin log-magnitude DFT spectral cosine similarity
-    let n_fft = n_common.min(4096);
-    let bins = 64usize;
-    let mut spec_r = vec![0.0_f64; bins];
-    let mut spec_p = vec![0.0_f64; bins];
-    for b in 0..bins {
-        let k = 1 + b * (n_fft / 2 - 1) / bins;
-        let w = std::f64::consts::TAU * k as f64 / n_fft as f64;
-        let (mut rr, mut ri, mut pr, mut pi) = (0.0, 0.0, 0.0, 0.0);
-        for i in 0..n_fft {
-            let (s, c) = (w * i as f64).sin_cos();
-            rr += r.samples[i] * c;
-            ri -= r.samples[i] * s;
-            pr += p.samples[i] * c;
-            pi -= p.samples[i] * s;
+    // Windowed time-frequency band relative magnitude error (4 time windows x 4 freq bands)
+    let n_wins = 4usize;
+    let win_len = (n_common / n_wins).max(64).min(512);
+    let bands = [(0.0, 400.0), (400.0, 1500.0), (1500.0, 4000.0), (4000.0, 12000.0)];
+    let mut band_num = [0.0_f64; 4];
+    let mut band_den = [0.0_f64; 4];
+    for w_idx in 0..n_wins {
+        let start = w_idx * (n_common - win_len) / (n_wins - 1).max(1);
+        for k in 1..(win_len / 2) {
+            let freq = k as f64 * r.sample_rate as f64 / win_len as f64;
+            let Some(b_idx) = bands.iter().position(|&(lo, hi)| freq >= lo && freq < hi) else {
+                continue;
+            };
+            let w = std::f64::consts::TAU * k as f64 / win_len as f64;
+            let (mut rr, mut ri, mut pr, mut pi) = (0.0, 0.0, 0.0, 0.0);
+            for i in 0..win_len {
+                let (s, c) = (w * i as f64).sin_cos();
+                rr += r.samples[start + i] * c;
+                ri -= r.samples[start + i] * s;
+                pr += p.samples[start + i] * c;
+                pi -= p.samples[start + i] * s;
+            }
+            let mr = rr.hypot(ri);
+            let mp = pr.hypot(pi);
+            band_num[b_idx] += (mr - mp).abs();
+            band_den[b_idx] += mr;
         }
-        spec_r[b] = (1.0 + rr.hypot(ri)).ln();
-        spec_p[b] = (1.0 + pr.hypot(pi)).ln();
     }
-    let dot: f64 = spec_r.iter().zip(&spec_p).map(|(a, b)| a * b).sum();
-    let nr: f64 = spec_r.iter().map(|a| a * a).sum::<f64>().sqrt();
-    let np: f64 = spec_p.iter().map(|a| a * a).sum::<f64>().sqrt();
-    let spec_cos = if nr > 0.0 && np > 0.0 { dot / (nr * np) } else { 0.0 };
+    let band_rel: Vec<f64> = (0..4)
+        .map(|i| if band_den[i] > 1e-6 { band_num[i] / band_den[i] } else { 0.0 })
+        .collect();
+    let onset_lag = {
+        let r_on = r.samples.iter().position(|x| x.abs() > 25.0).unwrap_or(0) as isize;
+        let p_on = p.samples.iter().position(|x| x.abs() > 25.0).unwrap_or(0) as isize;
+        p_on - r_on
+    };
 
     println!(
-        "{name:15}  ref=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) vs proc=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) | wave_r={:.3}, env_r={:.3}, spec_cos={:.3}",
+        "{name:15}  ref=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) vs proc=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) | wave_r={:+.3}, env_r={:.3}, onset_lag={}smp, stft_rel_err=[{:.2},{:.2},{:.2},{:.2}]",
         r.samples.len(), r.sample_rate, rms(&r.samples), pk(&r.samples), dc(&r.samples),
         p.samples.len(), p.sample_rate, rms(&p.samples), pk(&p.samples), dc(&p.samples),
-        best_wave_corr, env_corr, spec_cos
+        best_wave_corr, env_corr, onset_lag, band_rel[0], band_rel[1], band_rel[2], band_rel[3]
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_wav_rejects_truncated_fmt_chunk() {
+        // Declared fmt chunk of 16 bytes, but only 8 bytes actually follow
+        let mut bad = Vec::new();
+        bad.extend_from_slice(b"RIFF");
+        bad.extend_from_slice(&20u32.to_le_bytes());
+        bad.extend_from_slice(b"WAVE");
+        bad.extend_from_slice(b"fmt ");
+        bad.extend_from_slice(&16u32.to_le_bytes());
+        bad.extend_from_slice(&[0u8; 8]);
+        assert!(parse_wav(&bad).is_err());
+    }
 }
 
 fn main() {

@@ -149,15 +149,17 @@ impl Framebuffer {
         highlight: bool,
         text: &str,
     ) {
-        for (i, ch) in text.chars().enumerate() {
-            let cx = x + (i as i32) * CHAR_ADVANCE;
-            let Some((glyph_idx, is_lower)) = char_to_glyph(ch) else {
-                continue;
-            };
-            let glyph = &assets.font_glyphs[glyph_idx];
-            let denom = if is_lower { 4 } else { 3 };
-            for row in 0..24i32 {
-                let gy = (row * 3) / denom + y;
+        for (line_idx, line) in text.split('\n').enumerate() {
+            let line_y = y - (line_idx as i32) * LINE_HEIGHT;
+            for (i, ch) in line.chars().enumerate() {
+                let cx = x + (i as i32) * CHAR_ADVANCE;
+                let Some((glyph_idx, is_lower)) = char_to_glyph(ch) else {
+                    continue;
+                };
+                let glyph = &assets.font_glyphs[glyph_idx];
+                let denom = if is_lower { 4 } else { 3 };
+                for row in 0..24i32 {
+                    let gy = (row * 3) / denom + line_y;
                 if gy < 0 || gy >= HEIGHT as i32 {
                     continue;
                 }
@@ -191,6 +193,7 @@ impl Framebuffer {
                     self.pixels[sy * WIDTH + gx] = out;
                 }
             }
+        }
         }
     }
 
@@ -343,6 +346,21 @@ mod tests {
         fb.draw_sprite_bu(&img, -2, -2);
         assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH], 0x00FF0000);
         assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH + 2], 0x00404040);
+    }
+
+    #[test]
+    fn draw_text_splits_newlines_across_vertical_lines() {
+        let assets = GameAssets::generate();
+        let mut fb = Framebuffer::new();
+        fb.draw_text(&assets, 100, 300, false, false, "A\nB");
+        // Line 0 ('A') renders near y_bu = 300..324 (sy = 276..299); Line 1 ('B') near y_bu = 276..300 (sy = 300..323)
+        let top_line_lit = (276..300).any(|sy| (100..124).any(|x| fb.pixels[sy * WIDTH + x] != 0));
+        let bot_line_lit = (300..324).any(|sy| (100..124).any(|x| fb.pixels[sy * WIDTH + x] != 0));
+        // Nothing should be drawn at x >= 120 on line 0 (i.e. no '\\n' characters concatenated horizontally)
+        let trailing_lit = (276..300).any(|sy| (124..180).any(|x| fb.pixels[sy * WIDTH + x] != 0));
+        assert!(top_line_lit);
+        assert!(bot_line_lit);
+        assert!(!trailing_lit);
     }
 
     #[test]
