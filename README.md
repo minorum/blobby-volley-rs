@@ -2,12 +2,11 @@
 
 A clean-room Rust rewrite of the classic **Blobby Volley** (v1.8.0.48) game, reconstructed via reverse engineering of `volley.exe` (see [REVERSE_ENGINEERING.md](REVERSE_ENGINEERING.md)).
 
-## Assets Setup
+## Assets
 
-This repository does not redistribute the original proprietary game assets. To run the game or the asset-unpacking test:
+All game graphics, sound effects, and localized strings are generated procedurally at startup (`src/procedural.rs`, `src/assets.rs`)—no external `.pak` or proprietary asset files are required to build or run the game.
 
-1. Obtain the original `blobby.zip` archive.
-2. Either extract it into `original/` inside the repository root (so `original/graph.pak`, `original/sound.pak`, and `original/text.pak` exist), or place `graph.pak`, `sound.pak`, and `text.pak` in the working directory.
+Optional development-only reference comparison tools (`examples/extract_ref.rs`, `examples/visual_reg.rs`) can compare procedural output against original `.pak` files placed in `original/`.
 
 ## Build & Run
 

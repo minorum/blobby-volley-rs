@@ -484,9 +484,9 @@ pub fn generate_background() -> Vec<u32> {
                 let cloud = fbm(xf * 0.007 + 2.1, yf * 0.022 + 0.4, 4);
                 let region = ((xf / 800.0) * 0.55 + t * 0.45).clamp(0.2, 1.0);
                 let wisp = ((cloud - 0.52) * 2.5 * region).clamp(0.0, 1.0);
-                let r = 14.0 + t * 38.0 + wisp * 95.0;
-                let g = 54.0 + t * 48.0 + wisp * 88.0;
-                let b = 222.0 + t * 14.0 + wisp * 22.0;
+                let r = 20.0 + t * 56.0 + wisp * 90.0;
+                let g = 58.0 + t * 52.0 + wisp * 84.0;
+                let b = 220.0 + t * 14.0 + wisp * 22.0;
                 rgb(r, g, b)
             } else if yf < sh_y {
                 // Ocean with horizon darkening and horizontal wave ripples
@@ -1164,9 +1164,15 @@ fn encode_wav_u8_mono(sample_rate: u32, samples: &[u8]) -> Vec<u8> {
     wav
 }
 
+fn symmetric_noise(idx: i32) -> f32 {
+    hash2(idx, 7) * 2.0 - 1.0
+}
+
 /// Synthesizes the referee whistle WAV (44.1 kHz, 8-bit mono, 20000 samples).
 /// Matches the original two-tone beat whistle (~2526.5 Hz + ~2667.0 Hz) with
-/// mild saturation clipping, producing the characteristic ~140 Hz pea-whistle warble.
+/// hard clipping at [-128, 127], producing the ~140.5 Hz pea-whistle warble.
+/// Note: the original `sound_00.wav` starts at full amplitude and ends mid-beat
+/// without an attack/release taper, which this matches directly.
 pub fn generate_whistle_wav() -> Vec<u8> {
     const SR: u32 = 44100;
     const N: usize = 20000;
@@ -1183,7 +1189,7 @@ pub fn generate_whistle_wav() -> Vec<u8> {
 
 /// Synthesizes the ball hit / menu click WAV (44.1 kHz, 8-bit mono, 2408 samples).
 /// Combines a ~1 ms soft pre-attack, a damped dual-mode volleyball thump (95 Hz + 186 Hz),
-/// and a fast-decaying ~2.35/2.74 kHz impact snap with subtle deterministic air noise.
+/// and a fast-decaying ~2.35/2.74 kHz impact snap with symmetric zero-mean air noise.
 pub fn generate_hit_wav() -> Vec<u8> {
     const SR: u32 = 44100;
     const N: usize = 2408;
@@ -1202,11 +1208,40 @@ pub fn generate_hit_wav() -> Vec<u8> {
             let snap = (36.0 * (th * 2350.0 * std::f32::consts::TAU).sin()
                 + 24.0 * (th * 2740.0 * std::f32::consts::TAU + 1.0).sin())
                 * (-th * 300.0).exp();
-            let n_raw = ((i as f32 * 12.9898).sin() * 43758.5453).fract() * 2.0 - 1.0;
-            let noise = n_raw * 16.0 * (-th * 130.0).exp();
+            let noise = symmetric_noise(i as i32) * 16.0 * (-th * 130.0).exp();
             gate * (thump + snap + noise)
         };
         samples.push((128.0 + val.clamp(-128.0, 127.0)).round().clamp(0.0, 255.0) as u8);
     }
     encode_wav_u8_mono(SR, &samples)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn symmetric_noise_is_bounded_and_near_zero_mean() {
+        let n = 4096;
+        let mut sum = 0.0_f64;
+        for i in 0..n {
+            let v = symmetric_noise(i);
+            assert!((-1.0..=1.0).contains(&v), "noise out of [-1, 1]: {v}");
+            sum += v as f64;
+        }
+        let mean = sum / n as f64;
+        assert!(mean.abs() < 0.03, "noise DC bias too large: {mean}");
+    }
+
+    #[test]
+    fn wav_generators_produce_valid_pcm_without_dc_bias() {
+        for (wav, expected_samples) in [(generate_whistle_wav(), 20000), (generate_hit_wav(), 2408)] {
+            assert_eq!(&wav[0..4], b"RIFF");
+            assert_eq!(&wav[8..12], b"WAVE");
+            assert_eq!(wav.len(), 44 + expected_samples);
+            let mean: f64 = wav[44..].iter().map(|&b| b as f64 - 128.0).sum::<f64>()
+                / expected_samples as f64;
+            assert!(mean.abs() < 2.0, "WAV DC offset too large: {mean}");
+        }
+    }
 }
