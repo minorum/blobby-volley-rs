@@ -1007,41 +1007,79 @@ fn ascii_strokes(ch: char) -> &'static [&'static [(f32, f32)]] {
     }
 }
 
-fn draw_card_text(buf: &mut [u32], w: usize, h: usize, x0: f32, y0: f32, cw: f32, ch: f32, text: &str) {
-    let adv = cw * 0.82;
-    for (i, c) in text.chars().enumerate() {
+fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
+    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn card_char_advance(ch: char) -> f32 {
+    match ch {
+        'i' | 'l' | '.' => 0.36,
+        't' | 'f' | 'r' | '/' | '-' => 0.52,
+        ' ' => 0.45,
+        'm' | 'w' | 'M' | 'W' => 1.02,
+        'A'..='Z' => 0.86,
+        _ => 0.72,
+    }
+}
+
+fn draw_card_text(
+    buf: &mut [u32],
+    w: usize,
+    h: usize,
+    x0: f32,
+    y0: f32,
+    cw: f32,
+    ch: f32,
+    slant: f32,
+    text: &str,
+) {
+    let mut shadow_mask = vec![0.0_f32; w * h];
+    let mut fg_mask = vec![0.0_f32; w * h];
+    let stroke_r = (cw * 0.085).max(0.75);
+    let mut cx = x0;
+
+    for c in text.chars() {
+        let adv = cw * card_char_advance(c);
         let strokes = ascii_strokes(c);
         if strokes.is_empty() {
+            cx += adv;
             continue;
         }
-        let cx = x0 + i as f32 * adv;
-        let px0 = (cx - 4.0).floor().max(0.0) as usize;
-        let px1 = (cx + cw + 6.0).ceil().min((w - 1) as f32) as usize;
+        let px0 = (cx - 5.0).floor().max(0.0) as usize;
+        let px1 = (cx + cw * 1.2 + 7.0).ceil().min((w - 1) as f32) as usize;
         let py0 = (y0 - 4.0).floor().max(0.0) as usize;
         let py1 = (y0 + ch * 1.3 + 6.0).ceil().min((h - 1) as f32) as usize;
-        let stroke_r = (cw * 0.11).max(0.9);
 
         for py in py0..=py1 {
             let by = h - 1 - py;
             for px in px0..=px1 {
-                // Shadow sample offset (-2.5, -2.5)
-                let sx = (px as f32 - 2.5 - cx - (y0 + ch - py as f32) * 0.15) / cw;
+                let sx = (px as f32 - 2.5 - cx - (y0 + ch - py as f32) * slant) / cw;
                 let sy = (py as f32 - 2.5 - y0) / ch;
                 let d_sh = dist_to_polylines(sx, sy, strokes) * cw - stroke_r;
-                if d_sh < 1.5 {
-                    let a_sh = (1.0 - (d_sh + 0.5) / 2.0).clamp(0.0, 1.0) * 0.42;
-                    darken_pixel(&mut buf[by * w + px], 1.0 - a_sh);
+                if d_sh < 2.2 {
+                    let a_sh = (1.0 - (d_sh + 0.4) / 2.6).clamp(0.0, 1.0) * 0.36;
+                    shadow_mask[by * w + px] = shadow_mask[by * w + px].max(a_sh);
                 }
 
-                // Foreground glyph
-                let gx = (px as f32 - cx - (y0 + ch - py as f32) * 0.15) / cw;
+                let gx = (px as f32 - cx - (y0 + ch - py as f32) * slant) / cw;
                 let gy = (py as f32 - y0) / ch;
                 let d_fg = dist_to_polylines(gx, gy, strokes) * cw - stroke_r;
                 if d_fg < 0.7 {
                     let cov = (1.0 - (d_fg + 0.2) / 0.9).clamp(0.0, 1.0);
-                    blend_pixel(&mut buf[by * w + px], 26.0, 26.0, 32.0, cov);
+                    fg_mask[by * w + px] = fg_mask[by * w + px].max(cov);
                 }
             }
+        }
+        cx += adv;
+    }
+
+    for i in 0..(w * h) {
+        if shadow_mask[i] > 0.0 {
+            darken_pixel(&mut buf[i], 1.0 - shadow_mask[i]);
+        }
+        if fg_mask[i] > 0.0 {
+            blend_pixel(&mut buf[i], 28.0, 28.0, 32.0, fg_mask[i]);
         }
     }
 }
@@ -1055,27 +1093,39 @@ pub fn generate_ending_splash() -> Sprite {
     for by in 0..H {
         let y = H - 1 - by;
         for x in 0..W {
-            if x < 2 || x >= W - 2 || y < 2 || y >= H - 2 {
-                pixels[by * W + x] = rgb(18.0, 18.0, 22.0);
+            if x == 0 || x == W - 1 || y == 0 || y == H - 1 {
+                pixels[by * W + x] = rgb(12.0, 13.0, 13.0);
                 continue;
             }
-            let weave = (((x + y) % 4) as f32 - 1.5) * 6.0 + (((x as i32 - y as i32).rem_euclid(4)) as f32 - 1.5) * 5.0;
-            let diag = if (x as f32 * 0.35 + y as f32) < 250.0 { -12.0 } else { 8.0 };
-            let grain = (hash2(x as i32, y as i32) - 0.5) * 10.0;
-            let r = (232.0 + weave + diag + grain).clamp(0.0, 255.0);
-            let g = (224.0 + weave + diag + grain).clamp(0.0, 255.0);
-            let b = (214.0 + weave + diag + grain).clamp(0.0, 255.0);
+            let weave = (((x + y) % 4) as f32 - 1.5) * 2.2
+                + (((x as i32 - y as i32).rem_euclid(4)) as f32 - 1.5) * 1.8;
+            // Subtle faded watermark of the beach sand/pole on the left and palm fronds on the right
+            let sand_edge = smoothstep(235.0, 175.0, x as f32 + (y as f32) * 0.25);
+            let palm_hint = if x > 240 && y < 220 {
+                let dx = (x as f32 - 330.0) / 80.0;
+                let dy = (y as f32 - 90.0) / 80.0;
+                let ang = dy.atan2(dx);
+                let fronds = ((ang * 5.0).cos()).max(0.0);
+                fronds * smoothstep(1.2, 0.2, (dx * dx + dy * dy).sqrt()) * 14.0
+            } else {
+                0.0
+            };
+            let grain = (hash2(x as i32, y as i32) - 0.5) * 5.0;
+            let base = 236.0 - sand_edge * 16.0 - palm_hint + weave + grain;
+            let r = (base + 1.0).clamp(0.0, 255.0);
+            let g = base.clamp(0.0, 255.0);
+            let b = (base + 2.0 - sand_edge * 3.0).clamp(0.0, 255.0);
             pixels[by * W + x] = rgb(r, g, b);
         }
     }
 
-    draw_card_text(&mut pixels, W, H, 12.0, 14.0, 20.0, 28.0, "Blobby Volley");
-    draw_card_text(&mut pixels, W, H, 28.0, 74.0, 16.0, 22.0, "programmiert von");
-    draw_card_text(&mut pixels, W, H, 92.0, 110.0, 17.0, 23.0, "Daniel Skoraszewsky");
-    draw_card_text(&mut pixels, W, H, 28.0, 152.0, 16.0, 22.0, "Grafik von");
-    draw_card_text(&mut pixels, W, H, 92.0, 188.0, 17.0, 23.0, "Silvio Mummert");
-    draw_card_text(&mut pixels, W, H, 26.0, 248.0, 11.5, 15.0, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text(&mut pixels, W, H, 26.0, 270.0, 11.5, 15.0, "www.t-online.de/home/mummertathome/");
+    draw_card_text(&mut pixels, W, H, 14.0, 12.0, 21.0, 31.0, 0.28, "Blobby Volley");
+    draw_card_text(&mut pixels, W, H, 29.0, 92.0, 18.0, 25.0, 0.26, "programmiert von");
+    draw_card_text(&mut pixels, W, H, 94.0, 132.0, 18.0, 24.0, 0.26, "Daniel Skoraszewsky");
+    draw_card_text(&mut pixels, W, H, 29.0, 170.0, 18.0, 24.0, 0.26, "Grafik von");
+    draw_card_text(&mut pixels, W, H, 102.0, 208.0, 18.0, 24.0, 0.26, "Silvio Mummert");
+    draw_card_text(&mut pixels, W, H, 24.0, 263.0, 10.5, 11.5, 0.04, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text(&mut pixels, W, H, 24.0, 281.0, 10.5, 11.5, 0.04, "www.t-online.de/home/mummertathome/");
 
     Sprite {
         width: W,
