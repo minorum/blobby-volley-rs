@@ -375,32 +375,44 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
     let pk = |s: &[f64]| s.iter().map(|&x| x.abs()).fold(0.0_f64, f64::max);
     let dc = |s: &[f64]| s.iter().sum::<f64>() / s.len() as f64;
 
-    // 5 ms RMS envelope correlation
-    let win = (r.sample_rate as usize / 200).max(1);
+    // Search lag over [-64, 64] samples so onset offsets >20 samples are captured,
+    // then evaluate waveform, envelope, and STFT on the same aligned slices.
     let n_common = r.samples.len().min(p.samples.len());
-    let env_r: Vec<f64> = r.samples[..n_common].chunks_exact(win).map(rms).collect();
-    let env_p: Vec<f64> = p.samples[..n_common].chunks_exact(win).map(rms).collect();
-    let env_corr = pearson_corr(&env_r, &env_p);
-
-    // Best-lag aligned waveform correlation (-20..=20 samples)
-    let mut best_wave_corr = -1.0_f64;
-    for lag in -20isize..=20 {
+    let mut best_lag = 0isize;
+    let mut best_wave_corr = -2.0_f64;
+    for lag in -64isize..=64 {
         let (rs, ps) = if lag >= 0 {
             (&r.samples[lag as usize..n_common], &p.samples[..n_common - lag as usize])
         } else {
             (&r.samples[..n_common - (-lag) as usize], &p.samples[(-lag) as usize..n_common])
         };
-        best_wave_corr = best_wave_corr.max(pearson_corr(rs, ps));
+        let c = pearson_corr(rs, ps);
+        if c > best_wave_corr {
+            best_wave_corr = c;
+            best_lag = lag;
+        }
     }
+    let (r_al, p_al) = if best_lag >= 0 {
+        (&r.samples[best_lag as usize..n_common], &p.samples[..n_common - best_lag as usize])
+    } else {
+        (&r.samples[..n_common - (-best_lag) as usize], &p.samples[(-best_lag) as usize..n_common])
+    };
+    let n_al = r_al.len();
+
+    // 5 ms RMS envelope correlation on aligned slices
+    let win = (r.sample_rate as usize / 200).max(1);
+    let env_r: Vec<f64> = r_al.chunks_exact(win).map(rms).collect();
+    let env_p: Vec<f64> = p_al.chunks_exact(win).map(rms).collect();
+    let env_corr = pearson_corr(&env_r, &env_p);
 
     // Windowed time-frequency band relative magnitude error (4 time windows x 4 freq bands)
     let n_wins = 4usize;
-    let win_len = (n_common / n_wins).max(64).min(512);
+    let win_len = (n_al / n_wins).max(64).min(512);
     let bands = [(0.0, 400.0), (400.0, 1500.0), (1500.0, 4000.0), (4000.0, 12000.0)];
     let mut band_num = [0.0_f64; 4];
     let mut band_den = [0.0_f64; 4];
     for w_idx in 0..n_wins {
-        let start = w_idx * (n_common - win_len) / (n_wins - 1).max(1);
+        let start = w_idx * (n_al - win_len) / (n_wins - 1).max(1);
         for k in 1..(win_len / 2) {
             let freq = k as f64 * r.sample_rate as f64 / win_len as f64;
             let Some(b_idx) = bands.iter().position(|&(lo, hi)| freq >= lo && freq < hi) else {
@@ -410,10 +422,10 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
             let (mut rr, mut ri, mut pr, mut pi) = (0.0, 0.0, 0.0, 0.0);
             for i in 0..win_len {
                 let (s, c) = (w * i as f64).sin_cos();
-                rr += r.samples[start + i] * c;
-                ri -= r.samples[start + i] * s;
-                pr += p.samples[start + i] * c;
-                pi -= p.samples[start + i] * s;
+                rr += r_al[start + i] * c;
+                ri -= r_al[start + i] * s;
+                pr += p_al[start + i] * c;
+                pi -= p_al[start + i] * s;
             }
             let mr = rr.hypot(ri);
             let mp = pr.hypot(pi);
@@ -424,17 +436,12 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
     let band_rel: Vec<f64> = (0..4)
         .map(|i| if band_den[i] > 1e-6 { band_num[i] / band_den[i] } else { 0.0 })
         .collect();
-    let onset_lag = {
-        let r_on = r.samples.iter().position(|x| x.abs() > 25.0).unwrap_or(0) as isize;
-        let p_on = p.samples.iter().position(|x| x.abs() > 25.0).unwrap_or(0) as isize;
-        p_on - r_on
-    };
 
     println!(
-        "{name:15}  ref=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) vs proc=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) | wave_r={:+.3}, env_r={:.3}, onset_lag={}smp, stft_rel_err=[{:.2},{:.2},{:.2},{:.2}]",
+        "{name:15}  ref=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) vs proc=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) | lag={:+}smp, wave_r={:+.3}, env_r={:.3}, stft_rel_err=[{:.2},{:.2},{:.2},{:.2}]",
         r.samples.len(), r.sample_rate, rms(&r.samples), pk(&r.samples), dc(&r.samples),
         p.samples.len(), p.sample_rate, rms(&p.samples), pk(&p.samples), dc(&p.samples),
-        best_wave_corr, env_corr, onset_lag, band_rel[0], band_rel[1], band_rel[2], band_rel[3]
+        best_lag, best_wave_corr, env_corr, band_rel[0], band_rel[1], band_rel[2], band_rel[3]
     );
 }
 
@@ -465,9 +472,12 @@ fn main() {
     let graph = load_pak_file(&orig_dir.join("graph.pak")).unwrap();
     let sound = load_pak_file(&orig_dir.join("sound.pak")).unwrap();
 
-    // 1. Ball frames (1..=16)
+    // 1. Ball frames (1..=16) - export all 16 frames and report worst-case frame
     let proc_ball = generate_ball_frames();
     let (mut b_mae, mut b_iou, mut b_bf1, mut b_ssim) = (0.0, 0.0, 0.0, 0.0);
+    let (mut b_worst_idx, mut b_worst_mae) = (0usize, 0.0_f64);
+    let mut ball_sheet_ref = Vec::with_capacity(16 * 64 * 64);
+    let mut ball_sheet_proc = Vec::with_capacity(16 * 64 * 64);
     for (k, proc_img) in proc_ball.iter().enumerate() {
         let mut ref_img = parse_bmp(&graph[1 + k]).unwrap();
         for p in &mut ref_img.pixels {
@@ -481,12 +491,17 @@ fn main() {
         b_iou += m.iou;
         b_bf1 += m.boundary_f1;
         b_ssim += m.ssim;
-        if k < 4 {
-            save_side_by_side_bu(&out_dir.join(format!("ball_{k:02}.ppm")), 64, 64, &ref_img.pixels, &proc_img.pixels);
+        if m.fg_mae > b_worst_mae {
+            b_worst_mae = m.fg_mae;
+            b_worst_idx = k;
         }
+        save_side_by_side_bu(&out_dir.join(format!("ball_{k:02}.ppm")), 64, 64, &ref_img.pixels, &proc_img.pixels);
+        ball_sheet_ref.extend_from_slice(&ref_img.pixels);
+        ball_sheet_proc.extend_from_slice(&proc_img.pixels);
     }
+    save_side_by_side_bu(&out_dir.join("ball_all.ppm"), 64, 16 * 64, &ball_sheet_ref, &ball_sheet_proc);
     println!(
-        "Ball (16f):      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4}",
+        "Ball (16f):      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4} (worst frame #{b_worst_idx}: fg_MAE={b_worst_mae:.2})",
         b_mae / 16.0,
         b_iou / 16.0,
         b_bf1 / 16.0,
@@ -594,7 +609,13 @@ fn main() {
         m_cur.fg_mae, m_cur.iou, m_cur.boundary_f1, m_cur.ssim
     );
 
-    let ref_logo = parse_bmp(&graph[89]).unwrap();
+    let mut ref_logo = parse_bmp(&graph[89]).unwrap();
+    for p in &mut ref_logo.pixels {
+        let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+        if sum <= 0x14 {
+            *p = 0;
+        }
+    }
     let proc_logo = generate_title_logo();
     let m_logo = compare_images(&ref_logo.pixels, &proc_logo.pixels, 410, 230, true);
     save_side_by_side_bu(&out_dir.join("title_logo.ppm"), 410, 230, &ref_logo.pixels, &proc_logo.pixels);
