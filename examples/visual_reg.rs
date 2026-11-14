@@ -579,6 +579,7 @@ fn main() {
     // 5. Font (55 glyphs)
     let proc_font = generate_font_glyphs(&proc_blobby[0]);
     let (mut f_mae, mut f_iou, mut f_bf1) = (0.0, 0.0, 0.0);
+    let (mut bv2_mae, mut bv2_iou, mut bv2_bf1) = (0.0, 0.0, 0.0);
     for (k, proc_img) in proc_font.iter().enumerate() {
         let mut ref_img = parse_bmp(&graph[22 + k]).unwrap();
         for p in &mut ref_img.pixels {
@@ -591,12 +592,20 @@ fn main() {
         f_mae += m.fg_mae;
         f_iou += m.iou;
         f_bf1 += m.boundary_f1;
+        if k <= 50 {
+            bv2_mae += m.fg_mae;
+            bv2_iou += m.iou;
+            bv2_bf1 += m.boundary_f1;
+        }
     }
     println!(
-        "Font (55g):      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        "Font (55g):      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4} (0..50 BV2: fg_MAE={:5.2}, IoU={:.4}, bF1={:.4})",
         f_mae / 55.0,
         f_iou / 55.0,
-        f_bf1 / 55.0
+        f_bf1 / 55.0,
+        bv2_mae / 51.0,
+        bv2_iou / 51.0,
+        bv2_bf1 / 51.0
     );
 
     // 6. Cursor, Title logo, Ending splash
