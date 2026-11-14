@@ -2,7 +2,7 @@ use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
-use crate::sim::{BallState, PlayerInput};
+use crate::sim::{PlayerInput, RallySim};
 
 pub const DISCOVERY_PORT: u16 = 24680;
 pub const GAME_PORT: u16 = 24681;
@@ -25,12 +25,15 @@ pub struct NetHost {
 }
 
 impl NetHost {
-    pub fn start(game_name: String, host_name: &str, host_color: usize) -> io::Result<Self> {
-        let discovery_sock = UdpSocket::bind(("0.0.0.0", DISCOVERY_PORT))?;
+    pub fn start(game_name: String) -> io::Result<Self> {
+        Self::bind(game_name, DISCOVERY_PORT, GAME_PORT)
+    }
+
+    fn bind(game_name: String, discovery_port: u16, game_port: u16) -> io::Result<Self> {
+        let discovery_sock = UdpSocket::bind(("0.0.0.0", discovery_port))?;
         discovery_sock.set_nonblocking(true)?;
-        let game_sock = UdpSocket::bind(("0.0.0.0", GAME_PORT))?;
+        let game_sock = UdpSocket::bind(("0.0.0.0", game_port))?;
         game_sock.set_nonblocking(true)?;
-        let _ = (host_name, host_color);
         Ok(Self {
             discovery_sock,
             game_sock,
@@ -58,7 +61,14 @@ impl NetHost {
                 self.peer_color = (buf[4] as usize) % 8;
                 let nlen = (buf[5] as usize).min(len - 6).min(12);
                 self.peer_name = String::from_utf8_lossy(&buf[6..6 + nlen]).to_string();
-                let mut ack = vec![b'B', b'V', b'O', b'K', host_color as u8, host_name.len().min(12) as u8];
+                let mut ack = vec![
+                    b'B',
+                    b'V',
+                    b'O',
+                    b'K',
+                    host_color as u8,
+                    host_name.len().min(12) as u8,
+                ];
                 ack.extend_from_slice(&host_name.as_bytes()[..host_name.len().min(12)]);
                 let _ = self.game_sock.send_to(&ack, src);
                 return true;
@@ -84,36 +94,27 @@ impl NetHost {
         None
     }
 
-    pub fn send_state(
-        &self,
-        ball: &BallState,
-        p0_x: i32,
-        p0_y: i32,
-        p0_frame: i32,
-        p1_x: i32,
-        p1_y: i32,
-        p1_frame: i32,
-        scores: [i32; 2],
-        server: usize,
-        is_first: bool,
-        sound_mask: u8,
-    ) {
+    pub fn send_state(&self, rally: &RallySim, sound_mask: u8) {
         let Some(peer) = self.peer else { return };
-        let mut pkt = Vec::with_capacity(40);
-        pkt.extend_from_slice(b"BVST");
-        pkt.extend_from_slice(&ball.x.to_le_bytes());
-        pkt.extend_from_slice(&ball.y.to_le_bytes());
-        pkt.extend_from_slice(&(p0_x as i16).to_le_bytes());
-        pkt.extend_from_slice(&(p0_y as i16).to_le_bytes());
-        pkt.push(p0_frame as u8);
-        pkt.extend_from_slice(&(p1_x as i16).to_le_bytes());
-        pkt.extend_from_slice(&(p1_y as i16).to_le_bytes());
-        pkt.push(p1_frame as u8);
-        pkt.push((ball.spin_phase >> 3) as u8);
-        pkt.push(scores[0] as u8);
-        pkt.push(scores[1] as u8);
-        pkt.push(if is_first { 0xFF } else { server as u8 });
-        pkt.push(sound_mask);
+        let mut pkt = [0u8; 27];
+        pkt[0..4].copy_from_slice(b"BVST");
+        pkt[4..8].copy_from_slice(&rally.ball.x.to_le_bytes());
+        pkt[8..12].copy_from_slice(&rally.ball.y.to_le_bytes());
+        pkt[12..14].copy_from_slice(&(rally.players[0].x as i16).to_le_bytes());
+        pkt[14..16].copy_from_slice(&(rally.players[0].y as i16).to_le_bytes());
+        pkt[16] = rally.players[0].anim_frame as u8;
+        pkt[17..19].copy_from_slice(&(rally.players[1].x as i16).to_le_bytes());
+        pkt[19..21].copy_from_slice(&(rally.players[1].y as i16).to_le_bytes());
+        pkt[21] = rally.players[1].anim_frame as u8;
+        pkt[22] = (rally.ball.spin_phase >> 3) as u8;
+        pkt[23] = rally.players[0].score as u8;
+        pkt[24] = rally.players[1].score as u8;
+        pkt[25] = if rally.is_first_rally {
+            0xFF
+        } else {
+            rally.server as u8
+        };
+        pkt[26] = sound_mask;
         let _ = self.game_sock.send_to(&pkt, peer);
     }
 
@@ -155,7 +156,9 @@ impl NetClient {
         };
         let _ = self.sock.send_to(b"BVQ?", addr_str);
         if target_ip.trim().is_empty() {
-            let _ = self.sock.send_to(b"BVQ?", format!("127.0.0.1:{DISCOVERY_PORT}"));
+            let _ = self
+                .sock
+                .send_to(b"BVQ?", format!("127.0.0.1:{DISCOVERY_PORT}"));
         }
     }
 
@@ -177,11 +180,19 @@ impl NetClient {
                 }
             }
         }
-        self.sessions.retain(|s| s.last_seen.elapsed() < Duration::from_secs(10));
+        self.sessions
+            .retain(|s| s.last_seen.elapsed() < Duration::from_secs(10));
     }
 
     pub fn join(&mut self, addr: SocketAddr, my_name: &str, my_color: usize) -> bool {
-        let mut pkt = vec![b'B', b'V', b'J', b'N', my_color as u8, my_name.len().min(12) as u8];
+        let mut pkt = vec![
+            b'B',
+            b'V',
+            b'J',
+            b'N',
+            my_color as u8,
+            my_name.len().min(12) as u8,
+        ];
         pkt.extend_from_slice(&my_name.as_bytes()[..my_name.len().min(12)]);
         for _ in 0..5 {
             let _ = self.sock.send_to(&pkt, addr);
@@ -202,7 +213,8 @@ impl NetClient {
 
     pub fn send_input(&self, input: PlayerInput) {
         let Some(addr) = self.host_addr else { return };
-        let bits = (u8::from(input.left)) | (u8::from(input.right) << 1) | (u8::from(input.jump) << 2);
+        let bits =
+            (u8::from(input.left)) | (u8::from(input.right) << 1) | (u8::from(input.jump) << 2);
         let pkt = [b'B', b'V', b'I', b'N', bits];
         let _ = self.sock.send_to(&pkt, addr);
     }
@@ -259,4 +271,101 @@ pub enum ClientStatePacket {
         sound_mask: u8,
     },
     Quit,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sim::PlayerControl;
+
+    #[test]
+    fn host_and_client_handshake_roundtrip() {
+        let mut host = NetHost::bind("TestGame".to_string(), 0, 0).unwrap();
+        let game_addr = SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+            host.game_sock.local_addr().unwrap().port(),
+        );
+        let handle = std::thread::spawn(move || {
+            let mut client = NetClient::new().unwrap();
+            let ok = client.join(game_addr, "Guest", 5);
+            (ok, client.host_name, client.host_color)
+        });
+
+        let mut joined = false;
+        for _ in 0..20 {
+            if host.poll_lobby("Host", 2) {
+                joined = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(joined);
+        assert_eq!(host.peer_name, "Guest");
+        assert_eq!(host.peer_color, 5);
+
+        let (ok, host_name, host_color) = handle.join().unwrap();
+        assert!(ok);
+        assert_eq!(host_name, "Host");
+        assert_eq!(host_color, 2);
+    }
+
+    #[test]
+    fn state_packet_serialization_roundtrip() {
+        let mut host = NetHost::bind("TestGame".to_string(), 0, 0).unwrap();
+        let mut client = NetClient::new().unwrap();
+        let client_addr = SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+            client.sock.local_addr().unwrap().port(),
+        );
+        let host_addr = SocketAddr::new(
+            std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+            host.game_sock.local_addr().unwrap().port(),
+        );
+        host.peer = Some(client_addr);
+        client.host_addr = Some(host_addr);
+
+        let mut rally = RallySim::new(
+            [PlayerControl::Keyboard, PlayerControl::Network],
+            [7, 4],
+            1,
+            false,
+            1,
+        );
+        rally.ball.x = 12345;
+        rally.ball.y = 6789;
+        rally.ball.spin_phase = 5 << 3;
+        host.send_state(&rally, 3);
+
+        std::thread::sleep(Duration::from_millis(5));
+        match client.poll_state() {
+            Some(ClientStatePacket::State {
+                ball_x,
+                ball_y,
+                scores,
+                spin_frame,
+                server_raw,
+                sound_mask,
+                ..
+            }) => {
+                assert_eq!(ball_x, 12345);
+                assert_eq!(ball_y, 6789);
+                assert_eq!(scores, [7, 4]);
+                assert_eq!(spin_frame, 5);
+                assert_eq!(server_raw, 1);
+                assert_eq!(sound_mask, 3);
+            }
+            _ => panic!("Expected State packet"),
+        }
+
+        client.send_input(PlayerInput {
+            left: true,
+            right: false,
+            jump: true,
+        });
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(host.poll_input(), None);
+        assert!(host.remote_input.left);
+        assert!(!host.remote_input.right);
+        assert!(host.remote_input.jump);
+    }
 }

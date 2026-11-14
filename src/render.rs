@@ -5,7 +5,7 @@ use crate::sim::MatchState;
 pub const WIDTH: usize = 800;
 pub const HEIGHT: usize = 600;
 pub const CHAR_ADVANCE: i32 = 20; // DAT_0044db4c = 0x14
-pub const LINE_HEIGHT: i32 = 24;  // DAT_0044db50 = 0x18
+pub const LINE_HEIGHT: i32 = 24; // DAT_0044db50 = 0x18
 
 pub struct Framebuffer {
     pub pixels: Vec<u32>,
@@ -19,100 +19,111 @@ impl Framebuffer {
     }
 
     #[inline]
-    pub fn set_bu(&mut self, x: i32, y: i32, color: u32) {
-        if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
-            let sy = (HEIGHT as i32 - 1 - y) as usize;
-            self.pixels[sy * WIDTH + x as usize] = color;
+    fn clip_rect_bu(
+        x0: i32,
+        y0: i32,
+        w: i32,
+        h: i32,
+    ) -> Option<(usize, usize, usize, usize, usize, usize)> {
+        let x_start = x0.max(0);
+        let x_end = (x0 + w).min(WIDTH as i32);
+        let y_start = y0.max(0);
+        let y_end = (y0 + h).min(HEIGHT as i32);
+        if x_start >= x_end || y_start >= y_end {
+            return None;
         }
+        Some((
+            x_start as usize,
+            x_end as usize,
+            y_start as usize,
+            y_end as usize,
+            (x_start - x0) as usize,
+            (y_start - y0) as usize,
+        ))
     }
 
-    #[inline]
-    pub fn get_bu(&self, x: i32, y: i32) -> u32 {
-        if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
-            let sy = (HEIGHT as i32 - 1 - y) as usize;
-            self.pixels[sy * WIDTH + x as usize]
-        } else {
-            0
-        }
-    }
-
-    pub fn copy_bg(&mut self, bg_bu: &[u32]) {
-        for y in 0..HEIGHT {
-            let src_off = y * WIDTH;
-            let dst_off = (HEIGHT - 1 - y) * WIDTH;
-            self.pixels[dst_off..dst_off + WIDTH]
-                .copy_from_slice(&bg_bu[src_off..src_off + WIDTH]);
-        }
+    pub fn copy_bg(&mut self, bg_top_down: &[u32]) {
+        self.pixels.copy_from_slice(bg_top_down);
     }
 
     pub fn darken_rect_bu(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, shift: u32) {
+        let Some((xs, xe, ys, ye, _, _)) = Self::clip_rect_bu(x0, y0, x1 - x0, y1 - y0) else {
+            return;
+        };
         let mask = match shift {
             1 => 0x00FEFEFE,
             2 => 0x00FCFCFC,
             _ => 0x00F8F8F8,
         };
-        for y in y0.max(0)..y1.min(HEIGHT as i32) {
-            for x in x0.max(0)..x1.min(WIDTH as i32) {
-                let c = self.get_bu(x, y);
-                self.set_bu(x, y, (c & mask) >> shift);
+        for sy in (HEIGHT - ye)..(HEIGHT - ys) {
+            let row = &mut self.pixels[sy * WIDTH + xs..sy * WIDTH + xe];
+            for p in row {
+                *p = (*p & mask) >> shift;
             }
         }
     }
 
     pub fn draw_title_logo(&mut self, logo: &BmpImage, dim_shift: u32) {
+        let Some((xs, xe, ys, ye, src_x0, src_y0)) =
+            Self::clip_rect_bu(30, 360, logo.width as i32, logo.height as i32)
+        else {
+            return;
+        };
         let mask = match dim_shift {
             0 => 0xFFFFFFFF,
             1 => 0x00FEFEFE,
             _ => 0x00FCFCFC,
         };
-        for row in 0..logo.height {
-            let y = 360 + row as i32;
-            for col in 0..logo.width {
-                let p = logo.pixels[row * logo.width + col];
+        let span = xe - xs;
+        for (i, y) in (ys..ye).enumerate() {
+            let sy = HEIGHT - 1 - y;
+            let src_off = (src_y0 + i) * logo.width + src_x0;
+            let dst = &mut self.pixels[sy * WIDTH + xs..sy * WIDTH + xe];
+            let src = &logo.pixels[src_off..src_off + span];
+            for (d, &p) in dst.iter_mut().zip(src) {
                 let sum = (p & 0xFF) + ((p >> 8) & 0xFF) + ((p >> 16) & 0xFF);
                 if sum > 0x14 {
-                    self.set_bu(30 + col as i32, y, (p & mask) >> dim_shift);
+                    *d = (p & mask) >> dim_shift;
                 }
             }
         }
     }
 
     pub fn draw_sprite_bu(&mut self, img: &BmpImage, x0: i32, y0: i32) {
-        for row in 0..img.height {
-            let y = y0 + row as i32;
-            if y < 0 || y >= HEIGHT as i32 {
-                continue;
-            }
-            for col in 0..img.width {
-                let x = x0 + col as i32;
-                if x < 0 || x >= WIDTH as i32 {
-                    continue;
-                }
-                let p = img.pixels[row * img.width + col];
+        let Some((xs, xe, ys, ye, src_x0, src_y0)) =
+            Self::clip_rect_bu(x0, y0, img.width as i32, img.height as i32)
+        else {
+            return;
+        };
+        let span = xe - xs;
+        for (i, y) in (ys..ye).enumerate() {
+            let sy = HEIGHT - 1 - y;
+            let src_off = (src_y0 + i) * img.width + src_x0;
+            let dst = &mut self.pixels[sy * WIDTH + xs..sy * WIDTH + xe];
+            let src = &img.pixels[src_off..src_off + span];
+            for (d, &p) in dst.iter_mut().zip(src) {
                 if p != 0 {
-                    self.set_bu(x, y, p);
+                    *d = p;
                 }
             }
         }
     }
 
     pub fn draw_shadow_bu(&mut self, img: &BmpImage, x0: i32, y0: i32) {
-        // Shadows in original are pre-halved/quartered and drawn with non-zero pixels overwriting/blending
-        for row in 0..img.height {
-            let y = y0 + row as i32;
-            if y < 0 || y >= HEIGHT as i32 {
-                continue;
-            }
-            for col in 0..img.width {
-                let x = x0 + col as i32;
-                if x < 0 || x >= WIDTH as i32 {
-                    continue;
-                }
-                let p = img.pixels[row * img.width + col];
+        let Some((xs, xe, ys, ye, src_x0, src_y0)) =
+            Self::clip_rect_bu(x0, y0, img.width as i32, img.height as i32)
+        else {
+            return;
+        };
+        let span = xe - xs;
+        for (i, y) in (ys..ye).enumerate() {
+            let sy = HEIGHT - 1 - y;
+            let src_off = (src_y0 + i) * img.width + src_x0;
+            let dst = &mut self.pixels[sy * WIDTH + xs..sy * WIDTH + xe];
+            let src = &img.pixels[src_off..src_off + span];
+            for (d, &p) in dst.iter_mut().zip(src) {
                 if p != 0 {
-                    let bg = self.get_bu(x, y);
-                    let dark = (bg & 0x00FCFCFC) >> 1;
-                    self.set_bu(x, y, dark);
+                    *d = (*d & 0x00FCFCFC) >> 1;
                 }
             }
         }
@@ -143,11 +154,11 @@ impl Framebuffer {
                 if gy < 0 || gy >= HEIGHT as i32 {
                     continue;
                 }
-                for col in 0..24i32 {
-                    let gx = cx + col;
-                    if gx < 0 || gx >= WIDTH as i32 {
-                        continue;
-                    }
+                let sy = HEIGHT - 1 - gy as usize;
+                let col_start = (-cx).max(0);
+                let col_end = (WIDTH as i32 - cx).min(24);
+                for col in col_start..col_end {
+                    let gx = (cx + col) as usize;
                     let p = glyph.pixels[(row as usize) * 24 + col as usize];
                     if (p & 0x00E0E0E0) == 0 {
                         continue;
@@ -170,7 +181,7 @@ impl Framebuffer {
                         let v = (base - lum as i32).clamp(0, 255) as u32;
                         (v << 16) | (v << 8) | v
                     };
-                    self.set_bu(gx, gy, out);
+                    self.pixels[sy * WIDTH + gx] = out;
                 }
             }
         }
@@ -215,10 +226,25 @@ impl Framebuffer {
         let scores = [s0, s1];
         let serves = [serve0, serve1];
         for i in 0..2 {
-            let d0 = ((scores[i] % 100) / 10).to_string();
-            let d1 = (scores[i] % 10).to_string();
-            self.draw_text(assets, score_x[i], 540, false, false, &d0);
-            self.draw_text(assets, score_x[i] + 24, 540, false, false, &d1);
+            let s = scores[i].clamp(0, 99) as u8;
+            let d0 = [b'0' + s / 10];
+            let d1 = [b'0' + s % 10];
+            self.draw_text(
+                assets,
+                score_x[i],
+                540,
+                false,
+                false,
+                std::str::from_utf8(&d0).unwrap(),
+            );
+            self.draw_text(
+                assets,
+                score_x[i] + 24,
+                540,
+                false,
+                false,
+                std::str::from_utf8(&d1).unwrap(),
+            );
             if serves[i] {
                 self.draw_text(assets, score_x[i] + 48, 540, false, false, "!");
                 if mp && blink_on {
@@ -258,32 +284,66 @@ impl Framebuffer {
 pub fn char_to_glyph(ch: char) -> Option<(usize, bool)> {
     let code = ch as u32;
     let idx = match code {
-        0x30..=0x39 => (code - 0x30) as usize,       // '0'..'9' -> 0..9
-        0x41..=0x5A => (code - 0x37) as usize,       // 'A'..'Z' -> 10..35
+        0x30..=0x39 => (code - 0x30) as usize, // '0'..'9' -> 0..9
+        0x41..=0x5A => (code - 0x37) as usize, // 'A'..'Z' -> 10..35
         0x61..=0x7A => return Some(((code - 0x57) as usize, true)), // 'a'..'z' -> 10..35 lowercase
-        0x2E => 0x24, // '.'
-        0x21 => 0x25, // '!'
-        0x28 => 0x26, // '('
-        0x29 => 0x27, // ')'
-        0xDF => 0x28, // 'ß'
-        0xC4 => 0x29, // 'Ä'
-        0xD6 => 0x2A, // 'Ö'
-        0xDC => 0x2B, // 'Ü'
-        0xE4 => return Some((0x29, true)), // 'ä'
-        0xF6 => return Some((0x2A, true)), // 'ö'
-        0xFC => return Some((0x2B, true)), // 'ü'
-        0x27 => 0x2C, // '\''
-        0x3A => 0x2D, // ':'
-        0x3B => 0x2E, // ';'
-        0x3F => 0x2F, // '?'
-        0x2C => 0x30, // ','
-        0x2F => 0x31, // '/'
-        0x2D => 0x32, // '-'
-        0x3C => 0x33, // '<' (P1 icon)
-        0x3E => 0x34, // '>' (P2 icon)
-        0xB2 => 0x35, // '²'
-        0xB3 => 0x36, // '³'
+        0x2E => 0x24,                          // '.'
+        0x21 => 0x25,                          // '!'
+        0x28 => 0x26,                          // '('
+        0x29 => 0x27,                          // ')'
+        0xDF => 0x28,                          // 'ß'
+        0xC4 => 0x29,                          // 'Ä'
+        0xD6 => 0x2A,                          // 'Ö'
+        0xDC => 0x2B,                          // 'Ü'
+        0xE4 => return Some((0x29, true)),     // 'ä'
+        0xF6 => return Some((0x2A, true)),     // 'ö'
+        0xFC => return Some((0x2B, true)),     // 'ü'
+        0x27 => 0x2C,                          // '\''
+        0x3A => 0x2D,                          // ':'
+        0x3B => 0x2E,                          // ';'
+        0x3F => 0x2F,                          // '?'
+        0x2C => 0x30,                          // ','
+        0x2F => 0x31,                          // '/'
+        0x2D => 0x32,                          // '-'
+        0x3C => 0x33,                          // '<' (P1 icon)
+        0x3E => 0x34,                          // '>' (P2 icon)
+        0xB2 => 0x35,                          // '²'
+        0xB3 => 0x36,                          // '³'
         _ => return None,
     };
     Some((idx, false))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn draw_sprite_and_darken_clip_cleanly_at_edges() {
+        let mut fb = Framebuffer::new();
+        fb.pixels.fill(0x00808080);
+        fb.darken_rect_bu(-10, -10, 10, 10, 1);
+        // Bottom-left corner pixel (y_bu = 0 -> sy = HEIGHT - 1, x = 0) should be halved
+        assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH], 0x00404040);
+        // Outside rect stays unchanged
+        assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH + 10], 0x00808080);
+
+        let img = BmpImage {
+            width: 4,
+            height: 4,
+            pixels: vec![0x00FF0000; 16],
+        };
+        fb.draw_sprite_bu(&img, -2, -2);
+        assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH], 0x00FF0000);
+        assert_eq!(fb.pixels[(HEIGHT - 1) * WIDTH + 2], 0x00404040);
+    }
+
+    #[test]
+    fn char_to_glyph_maps_ascii_and_german_umlauts() {
+        assert_eq!(char_to_glyph('0'), Some((0, false)));
+        assert_eq!(char_to_glyph('A'), Some((10, false)));
+        assert_eq!(char_to_glyph('a'), Some((10, true)));
+        assert_eq!(char_to_glyph('ä'), Some((0x29, true)));
+        assert_eq!(char_to_glyph(' '), None);
+    }
 }

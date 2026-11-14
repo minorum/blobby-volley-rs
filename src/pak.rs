@@ -137,7 +137,11 @@ pub fn parse_bmp(data: &[u8]) -> Result<BmpImage, String> {
         8 => {
             let palette_offset = 14 + header_size;
             let colors_used = u32::from_le_bytes(data[46..50].try_into().unwrap()) as usize;
-            let num_colors = if colors_used == 0 { 256 } else { colors_used.min(256) };
+            let num_colors = if colors_used == 0 {
+                256
+            } else {
+                colors_used.min(256)
+            };
             if data.len() < palette_offset + num_colors * 4 {
                 return Err("Truncated BMP palette".to_string());
             }
@@ -161,33 +165,17 @@ pub fn parse_bmp(data: &[u8]) -> Result<BmpImage, String> {
                 }
             }
         }
-        24 => {
-            let stride = (w * 3 + 3) & !3;
+        24 | 32 => {
+            let step = (bpp / 8) as usize;
+            let stride = (w * step + 3) & !3;
             for y in 0..h {
                 let dst_y = if top_down { h - 1 - y } else { y };
                 let row_off = pixel_offset + y * stride;
-                if row_off + w * 3 > data.len() {
-                    return Err("Truncated 24-bit BMP pixel data".to_string());
+                if row_off + w * step > data.len() {
+                    return Err(format!("Truncated {bpp}-bit BMP pixel data"));
                 }
                 for x in 0..w {
-                    let off = row_off + x * 3;
-                    let b = data[off] as u32;
-                    let g = data[off + 1] as u32;
-                    let r = data[off + 2] as u32;
-                    pixels[dst_y * w + x] = (r << 16) | (g << 8) | b;
-                }
-            }
-        }
-        32 => {
-            let stride = w * 4;
-            for y in 0..h {
-                let dst_y = if top_down { h - 1 - y } else { y };
-                let row_off = pixel_offset + y * stride;
-                if row_off + w * 4 > data.len() {
-                    return Err("Truncated 32-bit BMP pixel data".to_string());
-                }
-                for x in 0..w {
-                    let off = row_off + x * 4;
+                    let off = row_off + x * step;
                     let b = data[off] as u32;
                     let g = data[off + 1] as u32;
                     let r = data[off + 2] as u32;

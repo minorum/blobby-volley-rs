@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::pak::{load_pak_file, parse_bmp, BmpImage};
 
@@ -48,7 +49,10 @@ impl LocalizedText {
                 current = line.to_string();
                 sections.entry(current.clone()).or_default();
             } else if !current.is_empty() {
-                sections.entry(current.clone()).or_default().push(line.to_string());
+                sections
+                    .entry(current.clone())
+                    .or_default()
+                    .push(line.to_string());
             }
         }
         Self { sections }
@@ -64,8 +68,8 @@ impl LocalizedText {
 }
 
 pub struct GameAssets {
-    pub bg: Vec<u32>,          // 800x600 bottom-up
-    pub bg_dark: Vec<u32>,     // 800x600 bottom-up (1/8 brightness for menus)
+    pub bg: Vec<u32>,                       // 800x600 top-down (matches Framebuffer)
+    pub bg_dark: Vec<u32>,                  // 800x600 top-down (1/8 brightness for menus)
     pub ball_frames: Vec<BmpImage>,         // 16 frames of 64x64
     pub blobby_base: Vec<BmpImage>,         // 5 frames of 148x101 (grayscale base)
     pub blobby_colored: [Vec<BmpImage>; 2], // 5 frames per player
@@ -76,7 +80,7 @@ pub struct GameAssets {
     pub cursor: BmpImage,                   // 48x48
     pub title_logo: BmpImage,               // entry 89 (410x230)
     pub ending_splash: BmpImage,            // entry 90 (400x300)
-    pub sounds: [Vec<u8>; 2],               // 0: whistle, 1: hit/menu click
+    pub sounds: [Arc<[u8]>; 2],             // 0: whistle, 1: hit/menu click
     pub texts: [LocalizedText; 3],          // 0: FR, 1: DE, 2: EN
 }
 
@@ -129,7 +133,12 @@ impl GameAssets {
                 }
             }
         }
-        let bg = bg_img.pixels;
+        // Flip background to top-down once so per-frame copy_bg is a single memcpy.
+        let mut bg = vec![0u32; 800 * 600];
+        for y in 0..600 {
+            bg[(599 - y) * 800..(600 - y) * 800]
+                .copy_from_slice(&bg_img.pixels[y * 800..(y + 1) * 800]);
+        }
         let bg_dark: Vec<u32> = bg.iter().map(|&p| (p & 0x00F8F8F8) >> 3).collect();
 
         // Ball frames (1..=16)
@@ -166,7 +175,6 @@ impl GameAssets {
             font_glyphs.push(img);
         }
         let font_icon_base = font_glyphs[0x33].clone();
-        font_glyphs[0x35 - 2] = font_icon_base.clone(); // entry 0x33 copied to 0x35 in original? Wait: 0x33=51, 0x9778e8 is 0x35 (53)
 
         // Blobby shadows (77..=86)
         let mut blobby_shadows = Vec::with_capacity(10);
@@ -204,7 +212,10 @@ impl GameAssets {
         if sound_entries.len() < 2 {
             return Err("sound.pak has fewer than 2 entries".to_string());
         }
-        let sounds = [sound_entries[0].clone(), sound_entries[1].clone()];
+        let sounds = [
+            Arc::from(sound_entries[0].as_slice()),
+            Arc::from(sound_entries[1].as_slice()),
+        ];
 
         // Texts
         let text_entries = load_pak_file(&dir.join("text.pak"))?;
@@ -266,5 +277,29 @@ impl GameAssets {
             }
         }
         self.font_glyphs[0x33 + player_idx] = icon;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn localized_text_parses_sections_and_crlf() {
+        let raw = b"@main\r\nStart\r\nQuit\r\n@names\r\nAdam\r\n";
+        let lt = LocalizedText::parse(raw);
+        assert_eq!(lt.get("@main", 0), "Start");
+        assert_eq!(lt.get("@main", 1), "Quit");
+        assert_eq!(lt.get("@names", 0), "Adam");
+        assert_eq!(lt.get("@missing", 0), "");
+    }
+
+    #[test]
+    fn tint_pixel_preserves_black_and_adds_highlight() {
+        assert_eq!(tint_pixel(0xFF0000, 0x000000), 0);
+        // White pixel (255,255,255) with red color gets highlight on all channels
+        let tinted = tint_pixel(0xFF0000, 0xFFFFFF);
+        assert_eq!(tinted >> 16, 255);
+        assert!(tinted & 0xFF > 0);
     }
 }

@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
@@ -9,7 +10,7 @@ use crate::sim::PlayerControl;
 #[derive(Clone, Debug)]
 pub struct StatEntry {
     pub name: String,
-    pub gms: [i16; 5],   // 0: vs humans, 1: vs Adam, 2: vs Bert, 3: vs Carl, 4: all
+    pub gms: [i16; 5], // 0: vs humans, 1: vs Adam, 2: vs Bert, 3: vs Carl, 4: all
     pub won: [i16; 5],
     pub score: [i16; 5],
 }
@@ -93,13 +94,13 @@ impl GameSettings {
                 PlayerControl::AiHard => 3,
                 _ => 0,
             };
-            let name = self.player_names[i].clone();
+            let name = &self.player_names[i];
             let pos = self
                 .stats
                 .iter()
-                .position(|s| s.name.eq_ignore_ascii_case(&name))
+                .position(|s| s.name.eq_ignore_ascii_case(name))
                 .unwrap_or_else(|| {
-                    self.stats.push(StatEntry::new(name));
+                    self.stats.push(StatEntry::new(name.clone()));
                     self.stats.len() - 1
                 });
             let entry = &mut self.stats[pos];
@@ -138,15 +139,23 @@ impl GameSettings {
                         "col0" => s.player_colors[0] = v.parse::<usize>().unwrap_or(0) % 8,
                         "col1" => s.player_colors[1] = v.parse::<usize>().unwrap_or(3) % 8,
                         "stat" => {
-                            let parts: Vec<&str> = v.split('|').collect();
-                            if parts.len() == 16 {
-                                let mut st = StatEntry::new(parts[0].to_string());
-                                for idx in 0..5 {
-                                    st.gms[idx] = parts[1 + idx].parse().unwrap_or(0);
-                                    st.won[idx] = parts[6 + idx].parse().unwrap_or(0);
-                                    st.score[idx] = parts[11 + idx].parse().unwrap_or(0);
+                            let mut parts = v.split('|');
+                            if let Some(name) = parts.next() {
+                                let mut nums = [0i16; 15];
+                                let mut count = 0;
+                                for p in parts {
+                                    if count < 15 {
+                                        nums[count] = p.parse().unwrap_or(0);
+                                    }
+                                    count += 1;
                                 }
-                                s.stats.push(st);
+                                if count == 15 {
+                                    let mut st = StatEntry::new(name.to_string());
+                                    st.gms.copy_from_slice(&nums[0..5]);
+                                    st.won.copy_from_slice(&nums[5..10]);
+                                    st.score.copy_from_slice(&nums[10..15]);
+                                    s.stats.push(st);
+                                }
                             }
                         }
                         _ => {}
@@ -158,22 +167,21 @@ impl GameSettings {
     }
 
     pub fn save_to_dir(&self, dir: &Path) {
-        let mut out = String::new();
-        out.push_str(&format!("lang={}\n", self.language as u8));
-        out.push_str(&format!("c0={}\n", self.controls[0] as u8));
-        out.push_str(&format!("c1={}\n", self.controls[1] as u8));
-        out.push_str(&format!("sound={}\n", u8::from(self.sound_enabled)));
-        out.push_str(&format!("n0={}\n", self.player_names[0]));
-        out.push_str(&format!("n1={}\n", self.player_names[1]));
-        out.push_str(&format!("col0={}\n", self.player_colors[0]));
-        out.push_str(&format!("col1={}\n", self.player_colors[1]));
+        let mut out = String::with_capacity(256);
+        let _ = writeln!(out, "lang={}", self.language as u8);
+        let _ = writeln!(out, "c0={}", self.controls[0] as u8);
+        let _ = writeln!(out, "c1={}", self.controls[1] as u8);
+        let _ = writeln!(out, "sound={}", u8::from(self.sound_enabled));
+        let _ = writeln!(out, "n0={}", self.player_names[0]);
+        let _ = writeln!(out, "n1={}", self.player_names[1]);
+        let _ = writeln!(out, "col0={}", self.player_colors[0]);
+        let _ = writeln!(out, "col1={}", self.player_colors[1]);
         for st in &self.stats {
-            let mut row = st.name.clone();
+            let _ = write!(out, "stat={}", st.name);
             for v in st.gms.iter().chain(st.won.iter()).chain(st.score.iter()) {
-                row.push('|');
-                row.push_str(&v.to_string());
+                let _ = write!(out, "|{v}");
             }
-            out.push_str(&format!("stat={row}\n"));
+            out.push('\n');
         }
         let _ = fs::write(dir.join("bv_settings.txt"), out);
     }
@@ -181,20 +189,98 @@ impl GameSettings {
 
 pub fn key_display_name(key: Key) -> &'static str {
     match key {
-        Key::A => "A", Key::B => "B", Key::C => "C", Key::D => "D",
-        Key::E => "E", Key::F => "F", Key::G => "G", Key::H => "H",
-        Key::I => "I", Key::J => "J", Key::K => "K", Key::L => "L",
-        Key::M => "M", Key::N => "N", Key::O => "O", Key::P => "P",
-        Key::Q => "Q", Key::R => "R", Key::S => "S", Key::T => "T",
-        Key::U => "U", Key::V => "V", Key::W => "W", Key::X => "X",
-        Key::Y => "Y", Key::Z => "Z",
-        Key::Key0 => "0", Key::Key1 => "1", Key::Key2 => "2", Key::Key3 => "3",
-        Key::Key4 => "4", Key::Key5 => "5", Key::Key6 => "6", Key::Key7 => "7",
-        Key::Key8 => "8", Key::Key9 => "9",
-        Key::Left => "left", Key::Right => "right", Key::Up => "up", Key::Down => "down",
-        Key::Space => "Space", Key::LeftShift | Key::RightShift => "Shift",
+        Key::A => "A",
+        Key::B => "B",
+        Key::C => "C",
+        Key::D => "D",
+        Key::E => "E",
+        Key::F => "F",
+        Key::G => "G",
+        Key::H => "H",
+        Key::I => "I",
+        Key::J => "J",
+        Key::K => "K",
+        Key::L => "L",
+        Key::M => "M",
+        Key::N => "N",
+        Key::O => "O",
+        Key::P => "P",
+        Key::Q => "Q",
+        Key::R => "R",
+        Key::S => "S",
+        Key::T => "T",
+        Key::U => "U",
+        Key::V => "V",
+        Key::W => "W",
+        Key::X => "X",
+        Key::Y => "Y",
+        Key::Z => "Z",
+        Key::Key0 => "0",
+        Key::Key1 => "1",
+        Key::Key2 => "2",
+        Key::Key3 => "3",
+        Key::Key4 => "4",
+        Key::Key5 => "5",
+        Key::Key6 => "6",
+        Key::Key7 => "7",
+        Key::Key8 => "8",
+        Key::Key9 => "9",
+        Key::Left => "left",
+        Key::Right => "right",
+        Key::Up => "up",
+        Key::Down => "down",
+        Key::Space => "Space",
+        Key::LeftShift | Key::RightShift => "Shift",
         Key::LeftCtrl | Key::RightCtrl => "Ctrl",
-        Key::Enter => "Enter", Key::Backspace => "backspc",
+        Key::Enter => "Enter",
+        Key::Backspace => "backspc",
         _ => "key",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn record_match_updates_human_and_all_buckets_only() {
+        let mut s = GameSettings::default();
+        s.player_names[0] = "Alice".to_string();
+        s.controls = [PlayerControl::Keyboard, PlayerControl::AiHard];
+        s.record_match([15, 10]);
+
+        assert_eq!(s.stats.len(), 1);
+        let st = &s.stats[0];
+        assert_eq!(st.name, "Alice");
+        // Bucket 3 = vs Carl (AiHard), Bucket 4 = all
+        assert_eq!(st.gms[3], 1);
+        assert_eq!(st.won[3], 1);
+        assert_eq!(st.score[3], 5);
+        assert_eq!(st.gms[4], 1);
+        assert_eq!(st.won[4], 1);
+        assert_eq!(st.score[4], 5);
+        assert_eq!(st.gms[0], 0);
+    }
+
+    #[test]
+    fn save_and_load_roundtrip() {
+        let dir = std::env::temp_dir().join("blobby_volley_rs_settings_test");
+        let _ = fs::create_dir_all(&dir);
+        let mut s = GameSettings::default();
+        s.language = Language::German;
+        s.sound_enabled = false;
+        s.player_names = ["Max".to_string(), "Moritz".to_string()];
+        s.player_colors = [2, 5];
+        s.record_match([15, 12]);
+        s.save_to_dir(&dir);
+
+        let loaded = GameSettings::load_from_dir(&dir);
+        assert_eq!(loaded.language, Language::German);
+        assert!(!loaded.sound_enabled);
+        assert_eq!(loaded.player_names, ["Max", "Moritz"]);
+        assert_eq!(loaded.player_colors, [2, 5]);
+        assert_eq!(loaded.stats.len(), 1);
+        assert_eq!(loaded.stats[0].score[4], 3);
+        let _ = fs::remove_dir_all(&dir);
     }
 }
