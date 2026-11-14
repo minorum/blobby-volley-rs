@@ -1105,41 +1105,49 @@ fn encode_wav_u8_mono(sample_rate: u32, samples: &[u8]) -> Vec<u8> {
     wav
 }
 
-/// Synthesizes the referee whistle WAV (44.1 kHz, 8-bit mono, ~0.45s).
+/// Synthesizes the referee whistle WAV (44.1 kHz, 8-bit mono, 20000 samples).
+/// Matches the original two-tone beat whistle (~2526.5 Hz + ~2667.0 Hz) with
+/// mild saturation clipping, producing the characteristic ~140 Hz pea-whistle warble.
 pub fn generate_whistle_wav() -> Vec<u8> {
     const SR: u32 = 44100;
     const N: usize = 20000;
     let mut samples = Vec::with_capacity(N);
-    let mut phase = 0.0_f32;
     for i in 0..N {
         let t = i as f32 / SR as f32;
-        let dur = N as f32 / SR as f32;
-        let env = (t / 0.015).min(1.0) * ((dur - t) / 0.045).clamp(0.0, 1.0);
-        // Pea-whistle trill at ~34 Hz modulating ~2600 Hz carrier
-        let trill = (t * 34.0 * std::f32::consts::TAU).sin();
-        let freq = 2595.0 + 75.0 * trill;
-        phase += freq * std::f32::consts::TAU / SR as f32;
-        let amp = 0.72 + 0.28 * trill;
-        let sig = phase.sin() * amp * env;
-        samples.push((128.0 + sig * 96.0).round().clamp(0.0, 255.0) as u8);
+        let s1 = (t * 2526.5 * std::f32::consts::TAU).sin();
+        let s2 = (t * 2667.0 * std::f32::consts::TAU).sin();
+        let sig = (125.0 * (s1 + s2)).clamp(-128.0, 127.0);
+        samples.push((128.0 + sig).round().clamp(0.0, 255.0) as u8);
     }
     encode_wav_u8_mono(SR, &samples)
 }
 
-/// Synthesizes the ball hit / menu click WAV (44.1 kHz, 8-bit mono, ~0.055s).
+/// Synthesizes the ball hit / menu click WAV (44.1 kHz, 8-bit mono, 2408 samples).
+/// Combines a ~1 ms soft pre-attack, a damped dual-mode volleyball thump (95 Hz + 186 Hz),
+/// and a fast-decaying ~2.35/2.74 kHz impact snap with subtle deterministic air noise.
 pub fn generate_hit_wav() -> Vec<u8> {
     const SR: u32 = 44100;
     const N: usize = 2408;
+    const HIT_START: f32 = 0.00105;
     let mut samples = Vec::with_capacity(N);
-    let mut phase = 0.0_f32;
     for i in 0..N {
         let t = i as f32 / SR as f32;
-        let env = (-t * 58.0).exp() * (t / 0.002).min(1.0);
-        let freq = 95.0 + 90.0 * (-t * 80.0).exp();
-        phase += freq * std::f32::consts::TAU / SR as f32;
-        let transient = if i < 90 { (i as f32 * 0.7).sin() * 0.35 } else { 0.0 };
-        let sig = (phase.sin() * 0.85 + transient) * env;
-        samples.push((128.0 + sig * 105.0).round().clamp(0.0, 255.0) as u8);
+        let val = if t < HIT_START {
+            14.0 * (t * 900.0 * std::f32::consts::TAU).sin()
+                * (std::f32::consts::PI * t / HIT_START).sin()
+        } else {
+            let th = t - HIT_START;
+            let gate = (th / 0.00045).min(1.0);
+            let thump = 62.0 * (th * 95.0 * std::f32::consts::TAU + 0.4).sin() * (-th * 50.0).exp()
+                + 54.0 * (th * 186.0 * std::f32::consts::TAU + 2.2).sin() * (-th * 82.0).exp();
+            let snap = (36.0 * (th * 2350.0 * std::f32::consts::TAU).sin()
+                + 24.0 * (th * 2740.0 * std::f32::consts::TAU + 1.0).sin())
+                * (-th * 300.0).exp();
+            let n_raw = ((i as f32 * 12.9898).sin() * 43758.5453).fract() * 2.0 - 1.0;
+            let noise = n_raw * 16.0 * (-th * 130.0).exp();
+            gate * (thump + snap + noise)
+        };
+        samples.push((128.0 + val.clamp(-128.0, 127.0)).round().clamp(0.0, 255.0) as u8);
     }
     encode_wav_u8_mono(SR, &samples)
 }
