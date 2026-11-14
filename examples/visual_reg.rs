@@ -629,7 +629,10 @@ fn main() {
     };
     let is_blue_bubble = |p: u32| -> u32 {
         let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
-        if p != 0 && !(g > b + 20 && g > r + 10) { p } else { 0 }
+        if p != 0 && !(g > b + 20 && g > r + 10) && b > r + 20 && b > g + 10 { p } else { 0 }
+    };
+    let is_ball_neutral = |p: u32| -> u32 {
+        if p != 0 && is_green_core(p) == 0 && is_blue_bubble(p) == 0 { p } else { 0 }
     };
     let ref_green: Vec<u32> = ref_logo.pixels.iter().copied().map(is_green_core).collect();
     let proc_green: Vec<u32> = proc_logo.pixels.iter().copied().map(is_green_core).collect();
@@ -637,6 +640,42 @@ fn main() {
     let ref_blue: Vec<u32> = ref_logo.pixels.iter().copied().map(is_blue_bubble).collect();
     let proc_blue: Vec<u32> = proc_logo.pixels.iter().copied().map(is_blue_bubble).collect();
     let m_logo_b = compare_images(&ref_blue, &proc_blue, 410, 230, true);
+    let ref_ball_seg: Vec<u32> = ref_logo.pixels.iter().copied().map(is_ball_neutral).collect();
+    let proc_ball_seg: Vec<u32> = proc_logo.pixels.iter().copied().map(is_ball_neutral).collect();
+    let m_logo_w = compare_images(&ref_ball_seg, &proc_ball_seg, 410, 230, true);
+    for (i, &p) in ref_logo.pixels.iter().enumerate() {
+        let cnt = usize::from(ref_green[i] != 0)
+            + usize::from(ref_blue[i] != 0)
+            + usize::from(ref_ball_seg[i] != 0);
+        assert_eq!(cnt, usize::from(p != 0), "logo masks must partition fg");
+    }
+    // Export contour overlay (green = ref edge, red = proc edge, yellow = overlap)
+    let logo_edges = |px: &[u32]| -> Vec<bool> {
+        let mut e = vec![false; 410 * 230];
+        for y in 1..229 {
+            for x in 1..409 {
+                let i = y * 410 + x;
+                if px[i] != 0
+                    && (px[i - 1] == 0 || px[i + 1] == 0 || px[i - 410] == 0 || px[i + 410] == 0)
+                {
+                    e[i] = true;
+                }
+            }
+        }
+        e
+    };
+    let re_logo = logo_edges(&ref_logo.pixels);
+    let pe_logo = logo_edges(&proc_logo.pixels);
+    let mut ov_ppm = format!("P6\n410 230\n255\n").into_bytes();
+    for y in (0..230).rev() {
+        for x in 0..410 {
+            let i = y * 410 + x;
+            ov_ppm.push(if pe_logo[i] { 255 } else { 0 });
+            ov_ppm.push(if re_logo[i] { 255 } else { 0 });
+            ov_ppm.push(0);
+        }
+    }
+    let _ = fs::write(out_dir.join("title_logo_contours.ppm"), ov_ppm);
     println!(
         "  logo green:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
         m_logo_g.fg_mae, m_logo_g.iou, m_logo_g.boundary_f1
@@ -644,6 +683,10 @@ fn main() {
     println!(
         "  logo blue:     fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
         m_logo_b.fg_mae, m_logo_b.iou, m_logo_b.boundary_f1
+    );
+    println!(
+        "  logo neutral:  fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        m_logo_w.fg_mae, m_logo_w.iou, m_logo_w.boundary_f1
     );
 
     let ref_end = parse_bmp(&graph[90]).unwrap();
