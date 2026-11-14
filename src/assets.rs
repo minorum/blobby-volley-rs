@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::pak::{load_pak_file, parse_bmp, BmpImage};
+use crate::pak::{load_pak_file, BmpImage};
 use crate::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
-    generate_blobby_shadows, generate_font_glyphs,
+    generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
+    generate_title_logo,
 };
 
 pub const BLOBBY_COLORS: [u32; 8] = [
@@ -144,10 +145,10 @@ impl GameAssets {
         // Ball shadow (procedural, 69x17)
         let ball_shadow = generate_ball_shadow();
 
-        // Cursor (88), title logo (89), ending splash (90)
-        let cursor = parse_bmp(&graph[88])?;
-        let title_logo = parse_bmp(&graph[89])?;
-        let ending_splash = parse_bmp(&graph[90])?;
+        // Cursor (48x48), title logo (410x230), ending splash (400x300) - procedural
+        let cursor = generate_cursor();
+        let title_logo = generate_title_logo();
+        let ending_splash = generate_ending_splash();
 
         // Sounds
         let sound_entries = load_pak_file(&dir.join("sound.pak"))?;

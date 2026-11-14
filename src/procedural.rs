@@ -794,3 +794,291 @@ pub fn generate_font_glyphs(blobby_base0: &BmpImage) -> Vec<BmpImage> {
     }
     glyphs
 }
+
+#[inline]
+fn point_in_triangle_dist(px: f32, py: f32, a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> f32 {
+    let d1 = dist_to_segment(px, py, a.0, a.1, b.0, b.1);
+    let d2 = dist_to_segment(px, py, b.0, b.1, c.0, c.1);
+    let d3 = dist_to_segment(px, py, c.0, c.1, a.0, a.1);
+    let edge = d1.min(d2).min(d3);
+    let s1 = (px - b.0) * (a.1 - b.1) - (a.0 - b.0) * (py - b.1);
+    let s2 = (px - c.0) * (b.1 - c.1) - (b.0 - c.0) * (py - c.1);
+    let s3 = (px - a.0) * (c.1 - a.1) - (c.0 - a.0) * (py - a.1);
+    let inside = (s1 >= 0.0 && s2 >= 0.0 && s3 >= 0.0) || (s1 <= 0.0 && s2 <= 0.0 && s3 <= 0.0);
+    if inside {
+        -edge
+    } else {
+        edge
+    }
+}
+
+/// Generates the 48x48 beveled green pointer cursor.
+pub fn generate_cursor() -> BmpImage {
+    const W: usize = 48;
+    const H: usize = 48;
+    let mut pixels = vec![0u32; W * H];
+
+    let cursor_sdf = |px: f32, py: f32| -> f32 {
+        // Arrow head: tip (3, 1), right wing (33, 17), left wing (14, 32)
+        let d_head = point_in_triangle_dist(px, py, (3.0, 1.0), (33.0, 17.0), (14.0, 32.0));
+        // Tail stem from (21, 21) to (42, 43) with half-width 4.0
+        let d_stem = dist_to_segment(px, py, 21.0, 21.0, 42.0, 43.0) - 4.0;
+        d_head.min(d_stem)
+    };
+
+    for by in 0..H {
+        let py = (H - 1 - by) as f32 + 0.5;
+        for x in 0..W {
+            let px = x as f32 + 0.5;
+            let d = cursor_sdf(px, py);
+            if d > 0.6 {
+                continue;
+            }
+            let cov = (1.0 - (d + 0.2) / 0.8).clamp(0.0, 1.0);
+            let gx = cursor_sdf(px + 0.5, py) - cursor_sdf(px - 0.5, py);
+            let gy = cursor_sdf(px, py + 0.5) - cursor_sdf(px, py - 0.5);
+            // Lit from top-right so upper-right bevel gleams yellow-white
+            let bevel = ((gx - gy) * 0.65).clamp(-0.35, 1.0);
+            let mottle = fbm(px * 0.22, py * 0.22, 3);
+            let rim = (1.0 - (-d / 4.5).clamp(0.0, 1.0)).powi(2);
+
+            let r = (25.0 + mottle * 65.0 + bevel.max(0.0) * 180.0 + rim * 70.0) * cov;
+            let g = (145.0 + mottle * 85.0 + bevel.max(0.0) * 95.0 + rim * 40.0) * cov;
+            let b = (18.0 + mottle * 35.0 + bevel.max(0.0) * 145.0) * cov;
+            let col = rgb(r, g, b);
+            if col != 0 {
+                pixels[by * W + x] = col;
+            }
+        }
+    }
+    BmpImage {
+        width: W,
+        height: H,
+        pixels,
+    }
+}
+
+fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
+    // Rotate into tilted word coordinates (~15 deg upward-right)
+    let ang = 0.24_f32;
+    let (ca, sa) = (ang.cos(), ang.sin());
+
+    // "Blobby" centered around (140, 74), scaled 1.25x
+    let bx = ((px - 140.0) * ca - (py - 74.0) * sa) / 1.25;
+    let by = ((px - 140.0) * sa + (py - 74.0) * ca) / 1.25;
+    let blobby_strokes: &[&[(f32, f32)]] = &[
+        // B
+        &[(-102.0, 26.0), (-92.0, -26.0), (-74.0, -26.0), (-70.0, -14.0), (-80.0, -2.0), (-96.0, -2.0)],
+        &[(-80.0, -2.0), (-68.0, 10.0), (-76.0, 26.0), (-102.0, 26.0)],
+        // l
+        &[(-52.0, -28.0), (-62.0, 26.0)],
+        // o
+        &[(-34.0, -4.0), (-22.0, 4.0), (-26.0, 22.0), (-40.0, 26.0), (-48.0, 14.0), (-42.0, 0.0), (-34.0, -4.0)],
+        // b1
+        &[(-6.0, -28.0), (-16.0, 26.0)],
+        &[(-12.0, 4.0), (2.0, 0.0), (8.0, 12.0), (0.0, 26.0), (-14.0, 24.0)],
+        // b2
+        &[(28.0, -28.0), (18.0, 26.0)],
+        &[(22.0, 4.0), (36.0, 0.0), (42.0, 12.0), (34.0, 26.0), (20.0, 24.0)],
+        // y
+        &[(58.0, -2.0), (56.0, 20.0), (70.0, 18.0), (82.0, -2.0), (68.0, 38.0), (50.0, 42.0)],
+    ];
+    let d1 = dist_to_polylines(bx, by, blobby_strokes) * 1.25;
+
+    // "Volley" centered around (290, 162), scaled 1.25x
+    let vx = ((px - 290.0) * ca - (py - 162.0) * sa) / 1.25;
+    let vy = ((px - 290.0) * sa + (py - 162.0) * ca) / 1.25;
+    let volley_strokes: &[&[(f32, f32)]] = &[
+        // V
+        &[(-88.0, -26.0), (-74.0, 26.0), (-50.0, -26.0)],
+        // l1
+        &[(2.0, -28.0), (-8.0, 26.0)],
+        // l2
+        &[(24.0, -28.0), (14.0, 26.0)],
+        // e
+        &[(38.0, 12.0), (56.0, 8.0), (58.0, -2.0), (44.0, -4.0), (34.0, 10.0), (38.0, 24.0), (54.0, 24.0)],
+        // y
+        &[(74.0, -2.0), (72.0, 20.0), (86.0, 18.0), (98.0, -2.0), (84.0, 38.0), (66.0, 42.0)],
+    ];
+    let d2 = dist_to_polylines(vx, vy, volley_strokes) * 1.25;
+
+    // Miniature volleyball at (256, 165) radius 26
+    let d_ball = ((px - 256.0).powi(2) + (py - 165.0).powi(2)).sqrt() - 26.0;
+    (d1.min(d2).min(d_ball + 6.0), d_ball <= 0.0)
+}
+
+/// Generates the 410x230 "Blobby Volley" title logo with bumpy blue outline,
+/// speckled green lettering, and embedded miniature volleyball.
+pub fn generate_title_logo() -> BmpImage {
+    const W: usize = 410;
+    const H: usize = 230;
+    let mut pixels = vec![0u32; W * H];
+
+    for by in 0..H {
+        let py = (H - 1 - by) as f32 + 0.5;
+        for x in 0..W {
+            let px = x as f32 + 0.5;
+            let (d, in_ball) = title_word_dist(px, py);
+
+            if in_ball {
+                // Miniature volleyball inside the 'o' of "Volley"
+                let nx = (px - 256.0) / 26.0;
+                let ny = (165.0 - py) / 26.0;
+                let nz = (1.0 - nx * nx - ny * ny).max(0.0).sqrt();
+                let ndotl = (nx * -0.40 + ny * 0.85 + nz * 0.34 + 0.4).max(0.0) / 1.4;
+                let shade = 105.0 + 150.0 * ndotl;
+                let seam_d = (ny.abs() - 0.55).abs().min((nx - 0.18).abs()).min((ny - 0.18).abs());
+                let seam = (-(seam_d / 0.07).powi(2)).exp();
+                let v = (shade * (1.0 - 0.16 * seam)).clamp(40.0, 255.0);
+                pixels[by * W + x] = rgb(v, v, v);
+                continue;
+            }
+
+            if d > 19.0 {
+                continue;
+            }
+            let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 32.0;
+            let bump = (fbm(px * 0.18, py * 0.18, 2) - 0.5) * 40.0;
+            if d <= 4.2 {
+                // Inner bright green letter with dark outline & highlight
+                let edge = ((4.2 - d) / 1.8).clamp(0.0, 1.0);
+                let r = (20.0 + edge * 65.0 + speckle * 0.8).clamp(0.0, 255.0);
+                let g = (145.0 + edge * 100.0 + speckle).clamp(0.0, 255.0);
+                let b = (15.0 + edge * 45.0 + speckle * 0.5).clamp(0.0, 255.0);
+                pixels[by * W + x] = rgb(r, g, b);
+            } else {
+                // Outer blue bumpy bubble
+                let t = ((19.0 - d) / 15.0).clamp(0.0, 1.0);
+                let r = (35.0 + t * 55.0 + bump * 0.6 + speckle * 0.7).clamp(0.0, 255.0);
+                let g = (45.0 + t * 65.0 + bump * 0.7 + speckle * 0.7).clamp(0.0, 255.0);
+                let b = (175.0 + t * 80.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
+                pixels[by * W + x] = rgb(r, g, b);
+            }
+        }
+    }
+    BmpImage {
+        width: W,
+        height: H,
+        pixels,
+    }
+}
+
+#[inline]
+fn y_td(by: usize, h: usize) -> usize {
+    h - 1 - by
+}
+
+fn ascii_strokes(ch: char) -> &'static [&'static [(f32, f32)]] {
+    match ch {
+        'A' => &[&[(0.1, 1.0), (0.5, 0.0), (0.9, 1.0)], &[(0.25, 0.65), (0.75, 0.65)]],
+        'B' => &[&[(0.15, 1.0), (0.15, 0.0), (0.7, 0.0), (0.85, 0.2), (0.7, 0.48), (0.15, 0.48)], &[(0.7, 0.48), (0.88, 0.72), (0.7, 1.0), (0.15, 1.0)]],
+        'D' => &[&[(0.15, 1.0), (0.15, 0.0), (0.65, 0.0), (0.88, 0.3), (0.88, 0.7), (0.65, 1.0), (0.15, 1.0)]],
+        'G' => &[&[(0.85, 0.2), (0.6, 0.0), (0.3, 0.0), (0.12, 0.35), (0.12, 0.75), (0.35, 1.0), (0.8, 0.9), (0.85, 0.55), (0.5, 0.55)]],
+        'M' => &[&[(0.1, 1.0), (0.15, 0.0), (0.5, 0.55), (0.85, 0.0), (0.9, 1.0)]],
+        'S' => &[&[(0.85, 0.15), (0.6, 0.0), (0.25, 0.15), (0.25, 0.42), (0.8, 0.58), (0.8, 0.88), (0.5, 1.0), (0.15, 0.85)]],
+        'V' => &[&[(0.1, 0.0), (0.5, 1.0), (0.9, 0.0)]],
+        'a' => &[&[(0.25, 0.45), (0.65, 0.4), (0.75, 0.6), (0.75, 1.0)], &[(0.75, 0.68), (0.3, 0.68), (0.2, 0.85), (0.35, 1.0), (0.75, 0.95)]],
+        'b' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.2, 0.55), (0.6, 0.42), (0.8, 0.65), (0.7, 0.98), (0.2, 0.95)]],
+        'd' => &[&[(0.8, 0.0), (0.8, 1.0)], &[(0.8, 0.55), (0.4, 0.42), (0.2, 0.65), (0.3, 0.98), (0.8, 0.95)]],
+        'e' => &[&[(0.2, 0.7), (0.8, 0.68), (0.75, 0.45), (0.45, 0.4), (0.2, 0.65), (0.25, 0.95), (0.7, 1.0)]],
+        'f' => &[&[(0.75, 0.05), (0.5, 0.0), (0.4, 0.25), (0.4, 1.0)], &[(0.2, 0.48), (0.68, 0.48)]],
+        'g' => &[&[(0.78, 0.42), (0.4, 0.42), (0.2, 0.62), (0.3, 0.88), (0.75, 0.85), (0.78, 0.42), (0.72, 1.15), (0.4, 1.25), (0.2, 1.15)]],
+        'h' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.2, 0.58), (0.55, 0.42), (0.78, 0.58), (0.78, 1.0)]],
+        'i' => &[&[(0.5, 0.45), (0.5, 1.0)], &[(0.5, 0.18)]],
+        'k' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.75, 0.42), (0.25, 0.72), (0.78, 1.0)]],
+        'l' => &[&[(0.5, 0.0), (0.5, 1.0)]],
+        'm' => &[&[(0.12, 1.0), (0.15, 0.42), (0.45, 0.45), (0.5, 1.0)], &[(0.45, 0.45), (0.8, 0.45), (0.85, 1.0)]],
+        'n' => &[&[(0.2, 1.0), (0.2, 0.42), (0.65, 0.42), (0.8, 0.6), (0.8, 1.0)]],
+        'o' => &[&[(0.5, 0.4), (0.8, 0.55), (0.78, 0.88), (0.48, 1.0), (0.2, 0.85), (0.22, 0.52), (0.5, 0.4)]],
+        'p' => &[&[(0.2, 0.42), (0.2, 1.25)], &[(0.2, 0.52), (0.62, 0.42), (0.8, 0.65), (0.68, 0.95), (0.2, 0.95)]],
+        'r' => &[&[(0.25, 1.0), (0.25, 0.42), (0.65, 0.42), (0.8, 0.52)]],
+        's' => &[&[(0.75, 0.48), (0.45, 0.4), (0.22, 0.52), (0.75, 0.78), (0.5, 1.0), (0.2, 0.9)]],
+        't' => &[&[(0.45, 0.1), (0.45, 0.92), (0.7, 1.0)], &[(0.22, 0.44), (0.72, 0.44)]],
+        'u' => &[&[(0.22, 0.42), (0.22, 0.92), (0.5, 1.0), (0.78, 0.88), (0.78, 0.42)]],
+        'v' => &[&[(0.18, 0.42), (0.5, 1.0), (0.82, 0.42)]],
+        'w' => &[&[(0.1, 0.42), (0.28, 1.0), (0.5, 0.55), (0.72, 1.0), (0.9, 0.42)]],
+        'y' => &[&[(0.2, 0.42), (0.48, 0.95)], &[(0.8, 0.42), (0.35, 1.25), (0.18, 1.22)]],
+        'z' => &[&[(0.2, 0.42), (0.8, 0.42), (0.2, 1.0), (0.8, 1.0)]],
+        '.' => &[&[(0.45, 0.92)]],
+        '-' => &[&[(0.25, 0.65), (0.75, 0.65)]],
+        '/' => &[&[(0.75, 0.1), (0.25, 1.0)]],
+        _ => &[],
+    }
+}
+
+fn draw_card_text(buf: &mut [u32], w: usize, h: usize, x0: f32, y0: f32, cw: f32, ch: f32, text: &str) {
+    let adv = cw * 0.82;
+    for (i, c) in text.chars().enumerate() {
+        let strokes = ascii_strokes(c);
+        if strokes.is_empty() {
+            continue;
+        }
+        let cx = x0 + i as f32 * adv;
+        let px0 = (cx - 4.0).floor().max(0.0) as usize;
+        let px1 = (cx + cw + 6.0).ceil().min((w - 1) as f32) as usize;
+        let py0 = (y0 - 4.0).floor().max(0.0) as usize;
+        let py1 = (y0 + ch * 1.3 + 6.0).ceil().min((h - 1) as f32) as usize;
+        let stroke_r = (cw * 0.11).max(0.9);
+
+        for py in py0..=py1 {
+            let by = h - 1 - py;
+            for px in px0..=px1 {
+                // Shadow sample offset (-2.5, -2.5)
+                let sx = (px as f32 - 2.5 - cx - (y0 + ch - py as f32) * 0.15) / cw;
+                let sy = (py as f32 - 2.5 - y0) / ch;
+                let d_sh = dist_to_polylines(sx, sy, strokes) * cw - stroke_r;
+                if d_sh < 1.5 {
+                    let a_sh = (1.0 - (d_sh + 0.5) / 2.0).clamp(0.0, 1.0) * 0.42;
+                    darken_pixel(&mut buf[by * w + px], 1.0 - a_sh);
+                }
+
+                // Foreground glyph
+                let gx = (px as f32 - cx - (y0 + ch - py as f32) * 0.15) / cw;
+                let gy = (py as f32 - y0) / ch;
+                let d_fg = dist_to_polylines(gx, gy, strokes) * cw - stroke_r;
+                if d_fg < 0.7 {
+                    let cov = (1.0 - (d_fg + 0.2) / 0.9).clamp(0.0, 1.0);
+                    blend_pixel(&mut buf[by * w + px], 26.0, 26.0, 32.0, cov);
+                }
+            }
+        }
+    }
+}
+
+/// Generates the 400x300 woven-paper ending credits splash card.
+pub fn generate_ending_splash() -> BmpImage {
+    const W: usize = 400;
+    const H: usize = 300;
+    let mut pixels = vec![0u32; W * H];
+
+    for by in 0..H {
+        let y = H - 1 - by;
+        for x in 0..W {
+            if x < 2 || x >= W - 2 || y < 2 || y >= H - 2 {
+                pixels[by * W + x] = rgb(18.0, 18.0, 22.0);
+                continue;
+            }
+            let weave = (((x + y) % 4) as f32 - 1.5) * 6.0 + (((x as i32 - y as i32).rem_euclid(4)) as f32 - 1.5) * 5.0;
+            let diag = if (x as f32 * 0.35 + y as f32) < 250.0 { -12.0 } else { 8.0 };
+            let grain = (hash2(x as i32, y as i32) - 0.5) * 10.0;
+            let r = (232.0 + weave + diag + grain).clamp(0.0, 255.0);
+            let g = (224.0 + weave + diag + grain).clamp(0.0, 255.0);
+            let b = (214.0 + weave + diag + grain).clamp(0.0, 255.0);
+            pixels[by * W + x] = rgb(r, g, b);
+        }
+    }
+
+    draw_card_text(&mut pixels, W, H, 12.0, 14.0, 20.0, 28.0, "Blobby Volley");
+    draw_card_text(&mut pixels, W, H, 28.0, 74.0, 16.0, 22.0, "programmiert von");
+    draw_card_text(&mut pixels, W, H, 92.0, 110.0, 17.0, 23.0, "Daniel Skoraszewsky");
+    draw_card_text(&mut pixels, W, H, 28.0, 152.0, 16.0, 22.0, "Grafik von");
+    draw_card_text(&mut pixels, W, H, 92.0, 188.0, 17.0, 23.0, "Silvio Mummert");
+    draw_card_text(&mut pixels, W, H, 26.0, 248.0, 11.5, 15.0, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text(&mut pixels, W, H, 26.0, 270.0, 11.5, 15.0, "www.t-online.de/home/mummertathome/");
+
+    BmpImage {
+        width: W,
+        height: H,
+        pixels,
+    }
+}

@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use blobby_volley_rs::pak::{load_pak_file, parse_bmp, BmpImage};
 use blobby_volley_rs::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
-    generate_blobby_shadows, generate_font_glyphs,
+    generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
+    generate_title_logo,
 };
 
 struct Metrics {
@@ -232,4 +233,23 @@ fn main() {
         &font_sheet_proc,
     );
     println!("Font (55 glyphs): mean mask IoU={:.4}", font_iou / 55.0);
+
+    // 6. Cursor (88), Title logo (89), Ending splash (90)
+    let ref_cursor = parse_bmp(&graph[88]).unwrap();
+    let proc_cursor = generate_cursor();
+    let m_cur = compare_images(&ref_cursor, &proc_cursor);
+    save_side_by_side(&out_dir.join("cursor.ppm"), &ref_cursor, &proc_cursor);
+    println!("Cursor: MAE={:.2}, IoU={:.4}", m_cur.mae, m_cur.iou);
+
+    let ref_logo = parse_bmp(&graph[89]).unwrap();
+    let proc_logo = generate_title_logo();
+    let m_logo = compare_images(&ref_logo, &proc_logo);
+    save_side_by_side(&out_dir.join("title_logo.ppm"), &ref_logo, &proc_logo);
+    println!("Title logo: MAE={:.2}, IoU={:.4}", m_logo.mae, m_logo.iou);
+
+    let ref_end = parse_bmp(&graph[90]).unwrap();
+    let proc_end = generate_ending_splash();
+    let m_end = compare_images(&ref_end, &proc_end);
+    save_side_by_side(&out_dir.join("ending_splash.ppm"), &ref_end, &proc_end);
+    println!("Ending splash: MAE={:.2}, PSNR={:.2} dB", m_end.mae, m_end.psnr);
 }
