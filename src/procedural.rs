@@ -978,33 +978,45 @@ fn y_td(by: usize, h: usize) -> usize {
 fn ascii_strokes(ch: char) -> &'static [&'static [(f32, f32)]] {
     match ch {
         'A' => &[&[(0.1, 1.0), (0.5, 0.0), (0.9, 1.0)], &[(0.25, 0.65), (0.75, 0.65)]],
-        'B' => &[&[(0.15, 1.0), (0.15, 0.0), (0.7, 0.0), (0.85, 0.2), (0.7, 0.48), (0.15, 0.48)], &[(0.7, 0.48), (0.88, 0.72), (0.7, 1.0), (0.15, 1.0)]],
-        'D' => &[&[(0.15, 1.0), (0.15, 0.0), (0.65, 0.0), (0.88, 0.3), (0.88, 0.7), (0.65, 1.0), (0.15, 1.0)]],
-        'G' => &[&[(0.85, 0.2), (0.6, 0.0), (0.3, 0.0), (0.12, 0.35), (0.12, 0.75), (0.35, 1.0), (0.8, 0.9), (0.85, 0.55), (0.5, 0.55)]],
-        'M' => &[&[(0.1, 1.0), (0.15, 0.0), (0.5, 0.55), (0.85, 0.0), (0.9, 1.0)]],
-        'S' => &[&[(0.85, 0.15), (0.6, 0.0), (0.25, 0.15), (0.25, 0.42), (0.8, 0.58), (0.8, 0.88), (0.5, 1.0), (0.15, 0.85)]],
-        'V' => &[&[(0.1, 0.0), (0.5, 1.0), (0.9, 0.0)]],
-        'a' => &[&[(0.25, 0.45), (0.65, 0.4), (0.75, 0.6), (0.75, 1.0)], &[(0.75, 0.68), (0.3, 0.68), (0.2, 0.85), (0.35, 1.0), (0.75, 0.95)]],
-        'b' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.2, 0.55), (0.6, 0.42), (0.8, 0.65), (0.7, 0.98), (0.2, 0.95)]],
-        'd' => &[&[(0.8, 0.0), (0.8, 1.0)], &[(0.8, 0.55), (0.4, 0.42), (0.2, 0.65), (0.3, 0.98), (0.8, 0.95)]],
-        'e' => &[&[(0.2, 0.7), (0.8, 0.68), (0.75, 0.45), (0.45, 0.4), (0.2, 0.65), (0.25, 0.95), (0.7, 1.0)]],
-        'f' => &[&[(0.75, 0.05), (0.5, 0.0), (0.4, 0.25), (0.4, 1.0)], &[(0.2, 0.48), (0.68, 0.48)]],
-        'g' => &[&[(0.78, 0.42), (0.4, 0.42), (0.2, 0.62), (0.3, 0.88), (0.75, 0.85), (0.78, 0.42), (0.72, 1.15), (0.4, 1.25), (0.2, 1.15)]],
-        'h' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.2, 0.58), (0.55, 0.42), (0.78, 0.58), (0.78, 1.0)]],
-        'i' => &[&[(0.5, 0.45), (0.5, 1.0)], &[(0.5, 0.18)]],
-        'k' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.75, 0.42), (0.25, 0.72), (0.78, 1.0)]],
+        'B' => &[
+            &[(0.15, 1.0), (0.15, 0.0), (0.62, 0.0), (0.8, 0.08), (0.85, 0.22), (0.78, 0.38), (0.62, 0.47), (0.15, 0.47)],
+            &[(0.62, 0.47), (0.82, 0.56), (0.88, 0.72), (0.82, 0.9), (0.65, 1.0), (0.15, 1.0)],
+        ],
+        'D' => &[&[(0.15, 1.0), (0.15, 0.0), (0.55, 0.0), (0.78, 0.12), (0.88, 0.35), (0.88, 0.65), (0.78, 0.88), (0.55, 1.0), (0.15, 1.0)]],
+        'G' => &[&[(0.84, 0.22), (0.7, 0.05), (0.48, 0.0), (0.26, 0.1), (0.14, 0.35), (0.14, 0.7), (0.28, 0.92), (0.52, 1.0), (0.78, 0.9), (0.84, 0.56), (0.52, 0.56)]],
+        'M' => &[&[(0.1, 1.0), (0.15, 0.0), (0.5, 0.6), (0.85, 0.0), (0.9, 1.0)]],
+        'S' => &[&[(0.82, 0.16), (0.68, 0.03), (0.45, 0.0), (0.25, 0.1), (0.22, 0.28), (0.34, 0.42), (0.68, 0.52), (0.82, 0.68), (0.8, 0.88), (0.55, 1.0), (0.26, 0.95), (0.16, 0.82)]],
+        'V' => &[&[(0.12, 0.0), (0.5, 1.0), (0.88, 0.0)]],
+        'a' => &[
+            &[(0.24, 0.48), (0.45, 0.4), (0.68, 0.44), (0.75, 0.6), (0.75, 1.0)],
+            &[(0.75, 0.66), (0.38, 0.66), (0.2, 0.76), (0.2, 0.92), (0.38, 1.0), (0.65, 0.96), (0.75, 0.88)],
+        ],
+        'b' => &[
+            &[(0.2, 0.0), (0.2, 1.0)],
+            &[(0.2, 0.58), (0.38, 0.42), (0.62, 0.42), (0.78, 0.56), (0.8, 0.76), (0.7, 0.95), (0.45, 1.0), (0.2, 0.92)],
+        ],
+        'd' => &[
+            &[(0.8, 0.0), (0.8, 1.0)],
+            &[(0.8, 0.58), (0.62, 0.42), (0.38, 0.42), (0.22, 0.56), (0.2, 0.76), (0.3, 0.95), (0.55, 1.0), (0.8, 0.92)],
+        ],
+        'e' => &[&[(0.2, 0.68), (0.8, 0.68), (0.78, 0.5), (0.6, 0.4), (0.36, 0.42), (0.2, 0.6), (0.2, 0.82), (0.36, 0.98), (0.64, 1.0), (0.78, 0.92)]],
+        'f' => &[&[(0.75, 0.05), (0.52, 0.0), (0.42, 0.2), (0.42, 1.0)], &[(0.22, 0.45), (0.68, 0.45)]],
+        'g' => &[&[(0.78, 0.42), (0.45, 0.4), (0.24, 0.52), (0.2, 0.7), (0.32, 0.88), (0.6, 0.9), (0.78, 0.78), (0.78, 0.42), (0.75, 1.05), (0.6, 1.22), (0.36, 1.25), (0.2, 1.15)]],
+        'h' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.2, 0.58), (0.4, 0.42), (0.65, 0.42), (0.78, 0.58), (0.78, 1.0)]],
+        'i' => &[&[(0.5, 0.44), (0.5, 1.0)], &[(0.5, 0.16)]],
+        'k' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.76, 0.42), (0.24, 0.72), (0.78, 1.0)]],
         'l' => &[&[(0.5, 0.0), (0.5, 1.0)]],
-        'm' => &[&[(0.12, 1.0), (0.15, 0.42), (0.45, 0.45), (0.5, 1.0)], &[(0.45, 0.45), (0.8, 0.45), (0.85, 1.0)]],
-        'n' => &[&[(0.2, 1.0), (0.2, 0.42), (0.65, 0.42), (0.8, 0.6), (0.8, 1.0)]],
-        'o' => &[&[(0.5, 0.4), (0.8, 0.55), (0.78, 0.88), (0.48, 1.0), (0.2, 0.85), (0.22, 0.52), (0.5, 0.4)]],
-        'p' => &[&[(0.2, 0.42), (0.2, 1.25)], &[(0.2, 0.52), (0.62, 0.42), (0.8, 0.65), (0.68, 0.95), (0.2, 0.95)]],
-        'r' => &[&[(0.25, 1.0), (0.25, 0.42), (0.65, 0.42), (0.8, 0.52)]],
-        's' => &[&[(0.75, 0.48), (0.45, 0.4), (0.22, 0.52), (0.75, 0.78), (0.5, 1.0), (0.2, 0.9)]],
-        't' => &[&[(0.45, 0.1), (0.45, 0.92), (0.7, 1.0)], &[(0.22, 0.44), (0.72, 0.44)]],
-        'u' => &[&[(0.22, 0.42), (0.22, 0.92), (0.5, 1.0), (0.78, 0.88), (0.78, 0.42)]],
+        'm' => &[&[(0.12, 1.0), (0.14, 0.42), (0.36, 0.42), (0.48, 0.54), (0.5, 1.0)], &[(0.48, 0.54), (0.66, 0.42), (0.82, 0.54), (0.86, 1.0)]],
+        'n' => &[&[(0.2, 1.0), (0.2, 0.42), (0.45, 0.42), (0.7, 0.46), (0.8, 0.6), (0.8, 1.0)]],
+        'o' => &[&[(0.5, 0.4), (0.72, 0.48), (0.8, 0.7), (0.72, 0.92), (0.5, 1.0), (0.28, 0.92), (0.2, 0.7), (0.28, 0.48), (0.5, 0.4)]],
+        'p' => &[&[(0.2, 0.42), (0.2, 1.25)], &[(0.2, 0.56), (0.42, 0.42), (0.68, 0.44), (0.8, 0.66), (0.72, 0.92), (0.45, 1.0), (0.2, 0.92)]],
+        'r' => &[&[(0.25, 1.0), (0.25, 0.42), (0.52, 0.42), (0.76, 0.5)]],
+        's' => &[&[(0.75, 0.48), (0.5, 0.4), (0.25, 0.48), (0.26, 0.62), (0.68, 0.74), (0.76, 0.88), (0.52, 1.0), (0.22, 0.92)]],
+        't' => &[&[(0.45, 0.1), (0.45, 0.9), (0.68, 1.0)], &[(0.22, 0.44), (0.72, 0.44)]],
+        'u' => &[&[(0.22, 0.42), (0.22, 0.86), (0.38, 1.0), (0.62, 0.98), (0.78, 0.82), (0.78, 0.42)]],
         'v' => &[&[(0.18, 0.42), (0.5, 1.0), (0.82, 0.42)]],
-        'w' => &[&[(0.1, 0.42), (0.28, 1.0), (0.5, 0.55), (0.72, 1.0), (0.9, 0.42)]],
-        'y' => &[&[(0.2, 0.42), (0.48, 0.95)], &[(0.8, 0.42), (0.35, 1.25), (0.18, 1.22)]],
+        'w' => &[&[(0.12, 0.42), (0.28, 1.0), (0.5, 0.56), (0.72, 1.0), (0.88, 0.42)]],
+        'y' => &[&[(0.2, 0.42), (0.48, 0.95)], &[(0.8, 0.42), (0.36, 1.22), (0.18, 1.22)]],
         'z' => &[&[(0.2, 0.42), (0.8, 0.42), (0.2, 1.0), (0.8, 1.0)]],
         '.' => &[&[(0.45, 0.92)]],
         '-' => &[&[(0.25, 0.65), (0.75, 0.65)]],
@@ -1015,17 +1027,20 @@ fn ascii_strokes(ch: char) -> &'static [&'static [(f32, f32)]] {
 
 fn card_char_advance(ch: char) -> f32 {
     match ch {
-        'i' | 'l' | '.' => 0.36,
-        't' | 'f' | 'r' | '/' | '-' => 0.52,
-        ' ' => 0.45,
-        'm' | 'w' | 'M' | 'W' => 1.02,
-        'A'..='Z' => 0.86,
-        _ => 0.72,
+        'i' | 'l' | '.' => 0.32,
+        '/' => 0.38,
+        't' | 'f' | 'r' | '-' => 0.45,
+        ' ' => 0.42,
+        'w' => 0.74,
+        'm' | 'M' | 'W' => 0.90,
+        'A'..='Z' => 0.84,
+        _ => 0.69,
     }
 }
 
-fn draw_card_text(
-    buf: &mut [u32],
+fn draw_card_text_into(
+    shadow_mask: &mut [f32],
+    fg_mask: &mut [f32],
     w: usize,
     h: usize,
     x0: f32,
@@ -1033,11 +1048,10 @@ fn draw_card_text(
     cw: f32,
     ch: f32,
     slant: f32,
+    stroke_scale: f32,
     text: &str,
 ) {
-    let mut shadow_mask = vec![0.0_f32; w * h];
-    let mut fg_mask = vec![0.0_f32; w * h];
-    let stroke_r = (cw * 0.058).max(0.65);
+    let stroke_r = (cw * stroke_scale).max(0.48);
     let mut cx = x0;
 
     for c in text.chars() {
@@ -1048,40 +1062,31 @@ fn draw_card_text(
             continue;
         }
         let px0 = (cx - 5.0).floor().max(0.0) as usize;
-        let px1 = (cx + cw * 1.2 + 7.0).ceil().min((w - 1) as f32) as usize;
+        let px1 = (cx + cw * 1.2 + 8.0).ceil().min((w - 1) as f32) as usize;
         let py0 = (y0 - 4.0).floor().max(0.0) as usize;
-        let py1 = (y0 + ch * 1.3 + 6.0).ceil().min((h - 1) as f32) as usize;
+        let py1 = (y0 + ch * 1.3 + 7.0).ceil().min((h - 1) as f32) as usize;
 
         for py in py0..=py1 {
             let by = h - 1 - py;
             for px in px0..=px1 {
-                let sx = (px as f32 - 2.5 - cx - (y0 + ch - py as f32) * slant) / cw;
-                let sy = (py as f32 - 2.5 - y0) / ch;
+                let sx = (px as f32 - 2.8 - cx - (y0 + ch - py as f32) * slant) / cw;
+                let sy = (py as f32 - 2.8 - y0) / ch;
                 let d_sh = dist_to_polylines(sx, sy, strokes) * cw - stroke_r;
-                if d_sh < 2.2 {
-                    let a_sh = (1.0 - (d_sh + 0.4) / 2.6).clamp(0.0, 1.0) * 0.36;
+                if d_sh < 3.0 {
+                    let a_sh = (1.0 - (d_sh + 0.5) / 3.5).clamp(0.0, 1.0) * 0.45;
                     shadow_mask[by * w + px] = shadow_mask[by * w + px].max(a_sh);
                 }
 
                 let gx = (px as f32 - cx - (y0 + ch - py as f32) * slant) / cw;
                 let gy = (py as f32 - y0) / ch;
                 let d_fg = dist_to_polylines(gx, gy, strokes) * cw - stroke_r;
-                if d_fg < 0.7 {
-                    let cov = (1.0 - (d_fg + 0.2) / 0.9).clamp(0.0, 1.0);
+                if d_fg < 0.8 {
+                    let cov = (1.0 - (d_fg + 0.25) / 1.05).clamp(0.0, 1.0);
                     fg_mask[by * w + px] = fg_mask[by * w + px].max(cov);
                 }
             }
         }
         cx += adv;
-    }
-
-    for i in 0..(w * h) {
-        if shadow_mask[i] > 0.0 {
-            darken_pixel(&mut buf[i], 1.0 - shadow_mask[i] * 0.85);
-        }
-        if fg_mask[i] > 0.0 {
-            blend_pixel(&mut buf[i], 58.0, 58.0, 62.0, fg_mask[i]);
-        }
     }
 }
 
@@ -1089,46 +1094,78 @@ fn draw_card_text(
 pub fn generate_ending_splash() -> Sprite {
     const W: usize = 400;
     const H: usize = 300;
-    let bg = generate_background();
+    const TAU: f32 = std::f32::consts::TAU;
     let mut pixels = vec![0u32; W * H];
 
     for by in 0..H {
         let y = H - 1 - by;
+        let yf = y as f32;
         for x in 0..W {
             if x == 0 || x == W - 1 || y == 0 || y == H - 1 {
                 pixels[by * W + x] = rgb(12.0, 13.0, 13.0);
                 continue;
             }
-            // Washed-out 2x downsampled beach background with fine diagonal canvas weave
-            let bg_p = bg[(y * 2) * 800 + (x * 2)];
-            let br = ((bg_p >> 16) & 0xFF) as f32;
-            let bg_c = ((bg_p >> 8) & 0xFF) as f32;
-            let bb = (bg_p & 0xFF) as f32;
-            let lum = 0.299 * br + 0.587 * bg_c + 0.114 * bb;
-            let wash_r = 248.0 * 0.74 + (lum * 0.65 + br * 0.35) * 0.26;
-            let wash_g = 248.0 * 0.74 + (lum * 0.65 + bg_c * 0.35) * 0.26;
-            let wash_b = 249.0 * 0.74 + (lum * 0.65 + bb * 0.35) * 0.26;
-            let weave_dot =
-                if (x + y) % 4 == 0 && (x as i32 - y as i32).rem_euclid(4) == 0 {
-                    -8.0
-                } else {
-                    2.0
-                };
-            let grain = (hash2(x as i32, y as i32) - 0.5) * 4.0;
-            let r = (wash_r + weave_dot + grain).clamp(0.0, 255.0);
-            let g = (wash_g + weave_dot + grain).clamp(0.0, 255.0);
-            let b = (wash_b + weave_dot + grain).clamp(0.0, 255.0);
-            pixels[by * W + x] = rgb(r, g, b);
+            let xf = x as f32;
+            // Washed-out beach backdrop (left cliff/palms, central bright sky, right 3 palm crowns, lower sand)
+            let cliff = if xf < 105.0 && yf > 85.0 + xf * 0.12 && yf < 152.0 {
+                (1.0 - ((xf - 80.0) / 25.0).clamp(0.0, 1.0)) * 22.0
+            } else {
+                0.0
+            };
+            let left_palm = {
+                let d = ((xf - 38.0).powi(2) + (yf - 58.0).powi(2)).sqrt();
+                (1.0 - (d / 48.0).clamp(0.0, 1.0)) * 16.0
+            };
+            let right_palms = {
+                let mut p = 0.0_f32;
+                for &(px, py, pr) in &[(288.0_f32, 106.0_f32, 34.0_f32), (325.0, 90.0, 38.0), (368.0, 100.0, 34.0)] {
+                    let dx = xf - px;
+                    let dy = yf - py;
+                    let d = (dx * dx + dy * dy).sqrt();
+                    if d < pr {
+                        let ang = dy.atan2(dx);
+                        let frond = 0.55 + 0.45 * (ang * 7.0).cos().abs();
+                        p = p.max((1.0 - d / pr) * frond * 16.0);
+                    }
+                }
+                p
+            };
+            let sand_wash = if yf > 168.0 - xf * 0.03 {
+                ((yf - 168.0) / 132.0).clamp(0.0, 1.0) * 10.0
+            } else {
+                0.0
+            };
+            let base = 229.0 - cliff - left_palm - right_palms - sand_wash;
+
+            // Coherent rotated halftone screen matching graph.pak entry 90
+            let v1 = (TAU * (0.269 * xf - 0.093 * yf) + 1.7433).cos();
+            let v2 = (TAU * (0.087 * xf + 0.276 * yf) + 3.0886).cos();
+            let screen = (13.7 * v1 + 10.6 * v2).min(9.0);
+
+            let lum = (base + screen).clamp(0.0, 238.0);
+            let warm = if xf < 115.0 { 3.0 } else { 0.0 };
+            pixels[by * W + x] = rgb(lum + warm * 0.8, lum, lum - warm * 0.5);
         }
     }
 
-    draw_card_text(&mut pixels, W, H, 14.0, 14.0, 18.0, 26.0, 0.26, "Blobby Volley");
-    draw_card_text(&mut pixels, W, H, 29.0, 96.0, 15.5, 20.0, 0.24, "programmiert von");
-    draw_card_text(&mut pixels, W, H, 78.0, 133.0, 14.5, 21.0, 0.24, "Daniel Skoraszewsky");
-    draw_card_text(&mut pixels, W, H, 29.0, 170.0, 15.5, 20.0, 0.24, "Grafik von");
-    draw_card_text(&mut pixels, W, H, 88.0, 208.0, 15.0, 21.0, 0.24, "Silvio Mummert");
-    draw_card_text(&mut pixels, W, H, 24.0, 264.0, 9.8, 10.5, 0.04, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text(&mut pixels, W, H, 24.0, 282.0, 9.8, 10.5, 0.04, "www.t-online.de/home/mummertathome/");
+    let mut shadow_mask = vec![0.0_f32; W * H];
+    let mut fg_mask = vec![0.0_f32; W * H];
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 11.0, 13.0, 26.2, 26.5, 0.24, 0.064, "Blobby Volley");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 25.0, 94.0, 22.2, 20.0, 0.22, 0.062, "programmiert von");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 91.0, 131.0, 22.0, 21.0, 0.22, 0.062, "Daniel Skoraszewsky");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 28.0, 169.0, 21.4, 20.0, 0.22, 0.062, "Grafik von");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 100.0, 207.0, 21.6, 21.0, 0.22, 0.062, "Silvio Mummert");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 263.0, 15.3, 10.5, 0.03, 0.038, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 281.0, 15.7, 10.5, 0.03, 0.038, "www.t-online.de/home/mummertathome/");
+
+    for i in 0..(W * H) {
+        if shadow_mask[i] > 0.0 {
+            darken_pixel(&mut pixels[i], 1.0 - shadow_mask[i]);
+        }
+        if fg_mask[i] > 0.0 {
+            blend_pixel(&mut pixels[i], 56.0, 56.0, 60.0, fg_mask[i]);
+        }
+    }
 
     Sprite {
         width: W,
@@ -1245,6 +1282,52 @@ mod tests {
             let mean: f64 = wav[44..].iter().map(|&b| b as f64 - 128.0).sum::<f64>()
                 / expected_samples as f64;
             assert!(mean.abs() < 2.0, "WAV DC offset too large: {mean}");
+        }
+    }
+
+    #[test]
+    fn ending_splash_has_expected_dimensions_border_and_text_bands() {
+        let a = generate_ending_splash();
+        let b = generate_ending_splash();
+        assert_eq!((a.width, a.height), (400, 300));
+        assert_eq!(a.pixels, b.pixels);
+
+        let luma = |px: u32| -> f64 {
+            let r = ((px >> 16) & 0xFF) as f64;
+            let g = ((px >> 8) & 0xFF) as f64;
+            let b = (px & 0xFF) as f64;
+            0.299 * r + 0.587 * g + 0.114 * b
+        };
+
+        // Dark 1px frame
+        assert!(luma(a.pixels[0]) < 20.0);
+        assert!(luma(a.pixels[a.width * a.height - 1]) < 20.0);
+
+        // Text-free band (top-down y=55..88 -> bottom-up by=212..245) should stay bright
+        let mut blank_sum = 0.0;
+        let mut blank_n = 0usize;
+        for y in 55..88 {
+            let by = a.height - 1 - y;
+            for x in 10..390 {
+                blank_sum += luma(a.pixels[by * a.width + x]);
+                blank_n += 1;
+            }
+        }
+        let blank_mean = blank_sum / blank_n as f64;
+        assert!((200.0..=235.0).contains(&blank_mean), "unexpected blank mean {blank_mean}");
+
+        // Each of the 7 credit/URL bands must contain dark ink pixels (< 140 luma)
+        for (y0, y1) in [(12, 50), (92, 124), (130, 161), (168, 194), (206, 233), (262, 277), (280, 294)] {
+            let mut dark_cnt = 0usize;
+            for y in y0..=y1 {
+                let by = a.height - 1 - y;
+                for x in 10..390 {
+                    if luma(a.pixels[by * a.width + x]) < 140.0 {
+                        dark_cnt += 1;
+                    }
+                }
+            }
+            assert!(dark_cnt > 500, "missing text ink in band {y0}..={y1}: {dark_cnt}");
         }
     }
 }
