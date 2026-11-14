@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use blobby_volley_rs::pak::{load_pak_file, parse_bmp, BmpImage};
-use blobby_volley_rs::procedural::generate_ball_frames;
+use blobby_volley_rs::procedural::{generate_ball_frames, generate_blobby_frames};
 
 struct Metrics {
     mae: f64,
@@ -119,5 +119,31 @@ fn main() {
         ball_mae / 16.0,
         ball_psnr / 16.0,
         ball_iou / 16.0
+    );
+
+    // 2. Blobby base frames (17..=21)
+    let proc_blobby = generate_blobby_frames();
+    let mut blobby_mae = 0.0;
+    let mut blobby_psnr = 0.0;
+    let mut blobby_iou = 0.0;
+    for (k, proc_img) in proc_blobby.iter().enumerate() {
+        let mut ref_img = parse_bmp(&graph[17 + k]).unwrap();
+        for p in &mut ref_img.pixels {
+            let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
+            if sum < 0x28 {
+                *p = 0;
+            }
+        }
+        let m = compare_images(&ref_img, proc_img);
+        blobby_mae += m.mae;
+        blobby_psnr += m.psnr;
+        blobby_iou += m.iou;
+        save_side_by_side(&out_dir.join(format!("blobby_{k:02}.ppm")), &ref_img, proc_img);
+    }
+    println!(
+        "Blobby (5 frames): mean MAE={:.2}, mean PSNR={:.2} dB, mean IoU={:.4}",
+        blobby_mae / 5.0,
+        blobby_psnr / 5.0,
+        blobby_iou / 5.0
     );
 }

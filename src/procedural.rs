@@ -84,3 +84,115 @@ pub fn generate_ball_frames() -> Vec<BmpImage> {
     }
     frames
 }
+
+#[inline]
+fn sd_ellipsoid(
+    px: f32,
+    py: f32,
+    pz: f32,
+    cx: f32,
+    cy: f32,
+    rx: f32,
+    ry: f32,
+    rz: f32,
+) -> f32 {
+    let qx = (px - cx) / rx;
+    let qy = (py - cy) / ry;
+    let qz = pz / rz;
+    let k0 = (qx * qx + qy * qy + qz * qz).sqrt();
+    let k1 = ((qx / rx).powi(2) + (qy / ry).powi(2) + (qz / rz).powi(2)).sqrt();
+    if k1 > 1e-6 {
+        k0 * (k0 - 1.0) / k1
+    } else {
+        -rx.min(ry).min(rz)
+    }
+}
+
+#[inline]
+fn smin(a: f32, b: f32, k: f32) -> f32 {
+    let h = (0.5 + 0.5 * (b - a) / k).clamp(0.0, 1.0);
+    b * (1.0 - h) + a * h - k * h * (1.0 - h)
+}
+
+#[inline]
+fn normalize3(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    let len = (x * x + y * y + z * z).sqrt().max(1e-8);
+    (x / len, y / len, z / len)
+}
+
+/// Generates all 5 squash-and-stretch base frames (148x101 grayscale) of the Blobby character.
+///
+/// Uses an orthographic raymarched 3D smooth-union SDF of two ellipsoids (head + body)
+/// with two-light Phong shading matching the original specular highlights and base tones.
+pub fn generate_blobby_frames() -> Vec<BmpImage> {
+    const W: usize = 148;
+    const H: usize = 101;
+    const CX: f32 = 73.0;
+
+    let l1 = normalize3(-0.34, 0.86, 0.38);
+    let h1 = normalize3(l1.0, l1.1, l1.2 + 1.0);
+    let l2 = normalize3(0.36, -0.78, 0.51);
+    let h2 = normalize3(l2.0, l2.1, l2.2 + 1.0);
+
+    let mut frames = Vec::with_capacity(5);
+    for k in 0..5 {
+        let t = (k as f32) / 4.0;
+        let head_cy = 37.5 + 15.2 * t;
+        let head_rx = 25.2 - 1.8 * t;
+        let head_ry = 25.5 - 2.8 * t;
+        let body_cy = 69.5 + 11.5 * t;
+        let body_rx = 32.5 + 5.0 * t;
+        let body_ry = 31.2 - 11.5 * t;
+        let sk = 15.0 - 5.5 * t;
+
+        let sdf = |px: f32, py: f32, pz: f32| -> f32 {
+            let d1 = sd_ellipsoid(px, py, pz, CX, head_cy, head_rx, head_ry, head_rx);
+            let d2 = sd_ellipsoid(px, py, pz, CX, body_cy, body_rx, body_ry, body_rx);
+            smin(d1, d2, sk)
+        };
+
+        let mut pixels = vec![0u32; W * H];
+        // Bounding box of Blobby is x in [34..113], y_td in [10..101].
+        for by in 0..H {
+            let py = (H - 1 - by) as f32;
+            if py < 10.0 {
+                continue;
+            }
+            for x in 34..114 {
+                let px = x as f32;
+                let mut pz = 45.0_f32;
+                for _ in 0..30 {
+                    let d = sdf(px, py, pz);
+                    pz -= d * 0.85;
+                }
+                if sdf(px, py, pz) >= 0.35 {
+                    continue;
+                }
+
+                let eps = 0.25_f32;
+                let gx = sdf(px + eps, py, pz) - sdf(px - eps, py, pz);
+                let gy = -(sdf(px, py + eps, pz) - sdf(px, py - eps, pz));
+                let gz = sdf(px, py, pz + eps) - sdf(px, py, pz - eps);
+                let (nx, ny, nz) = normalize3(gx, gy, gz);
+
+                let d1 = (nx * l1.0 + ny * l1.1 + nz * l1.2).max(0.0);
+                let s1 = (nx * h1.0 + ny * h1.1 + nz * h1.2).max(0.0).powf(95.0);
+                let d2 = (nx * l2.0 + ny * l2.1 + nz * l2.2).max(0.0);
+                let s2 = (nx * h2.0 + ny * h2.1 + nz * h2.2).max(0.0).powf(100.0);
+
+                let val = (166.0 + 34.0 * d1 + 10.0 * d2 + 78.0 * s1 + 78.0 * s2)
+                    .round()
+                    .clamp(0.0, 255.0) as u32;
+                if val >= 14 {
+                    pixels[by * W + x] = (val << 16) | (val << 8) | val;
+                }
+            }
+        }
+        frames.push(BmpImage {
+            width: W,
+            height: H,
+            pixels,
+        });
+    }
+    frames
+}
