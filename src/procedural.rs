@@ -1109,7 +1109,7 @@ pub fn generate_ending_splash() -> Sprite {
                 0.0
             };
             let grain = (hash2(x as i32, y as i32) - 0.5) * 5.0;
-            let base = 236.0 - sand_edge * 16.0 - palm_hint + weave + grain;
+            let base = 220.0 - sand_edge * 14.0 - palm_hint + weave + grain;
             let r = (base + 1.0).clamp(0.0, 255.0);
             let g = base.clamp(0.0, 255.0);
             let b = (base + 2.0 - sand_edge * 3.0).clamp(0.0, 255.0);
@@ -1122,8 +1122,8 @@ pub fn generate_ending_splash() -> Sprite {
     draw_card_text(&mut pixels, W, H, 94.0, 132.0, 18.0, 24.0, 0.26, "Daniel Skoraszewsky");
     draw_card_text(&mut pixels, W, H, 29.0, 170.0, 18.0, 24.0, 0.26, "Grafik von");
     draw_card_text(&mut pixels, W, H, 102.0, 208.0, 18.0, 24.0, 0.26, "Silvio Mummert");
-    draw_card_text(&mut pixels, W, H, 24.0, 263.0, 10.5, 11.5, 0.04, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text(&mut pixels, W, H, 24.0, 281.0, 10.5, 11.5, 0.04, "www.t-online.de/home/mummertathome/");
+    draw_card_text(&mut pixels, W, H, 20.0, 263.0, 13.0, 12.0, 0.04, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text(&mut pixels, W, H, 20.0, 281.0, 13.0, 12.0, 0.04, "www.t-online.de/home/mummertathome/");
 
     Sprite {
         width: W,

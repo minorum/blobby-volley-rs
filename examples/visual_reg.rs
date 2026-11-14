@@ -708,16 +708,23 @@ fn main() {
             }
         }
     }
-    let ref_ball_cx = sx_sum / s_cnt.max(1) as f32;
-    let ref_ball_cy = sy_sum / s_cnt.max(1) as f32;
+    assert!(
+        s_cnt >= 500,
+        "reference ball ROI neutral pixel count too small: {s_cnt}"
+    );
+    let ref_ball_cx = sx_sum / s_cnt as f32;
+    let ref_ball_cy = sy_sum / s_cnt as f32;
     let ref_ball_r = (s_cnt as f32 / std::f32::consts::PI).sqrt();
     let ball_roi_r2 = (ref_ball_r + 6.0).powi(2);
 
     // Classify the reference-grounded ball ROI FIRST (independent of green/blue color predicates),
     // then partition remaining pixels into green lettering, blue bubble, and other edge pixels.
-    let segment_logo = |px_buf: &[u32]| -> (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) {
+    // Also extract an achromatic/neutral-only ball mask inside the ROI so ball geometry is not
+    // conflated with surrounding blue bubble pixels.
+    let segment_logo = |px_buf: &[u32]| -> (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) {
         let n = px_buf.len();
-        let (mut gr, mut bl, mut ball, mut other) = (vec![0; n], vec![0; n], vec![0; n], vec![0; n]);
+        let (mut gr, mut bl, mut ball_roi, mut ball_achrom, mut other) =
+            (vec![0; n], vec![0; n], vec![0; n], vec![0; n], vec![0; n]);
         for by in 0..230usize {
             let py = (229 - by) as f32 + 0.5;
             for x in 0..410usize {
@@ -729,7 +736,10 @@ fn main() {
                 let px = x as f32 + 0.5;
                 let in_ball_roi = (px - ref_ball_cx).powi(2) + (py - ref_ball_cy).powi(2) <= ball_roi_r2;
                 if in_ball_roi {
-                    ball[i] = p;
+                    ball_roi[i] = p;
+                    if is_green_core(p) == 0 && is_blue_bubble(p) == 0 {
+                        ball_achrom[i] = p;
+                    }
                 } else if is_green_core(p) != 0 {
                     gr[i] = p;
                 } else if is_blue_bubble(p) != 0 {
@@ -739,13 +749,14 @@ fn main() {
                 }
             }
         }
-        (gr, bl, ball, other)
+        (gr, bl, ball_roi, ball_achrom, other)
     };
-    let (ref_green, ref_blue, ref_ball_seg, ref_other_seg) = segment_logo(&ref_logo.pixels);
-    let (proc_green, proc_blue, proc_ball_seg, proc_other_seg) = segment_logo(&proc_logo.pixels);
+    let (ref_green, ref_blue, ref_ball_seg, ref_ball_achrom, ref_other_seg) = segment_logo(&ref_logo.pixels);
+    let (proc_green, proc_blue, proc_ball_seg, proc_ball_achrom, proc_other_seg) = segment_logo(&proc_logo.pixels);
     let m_logo_g = compare_images(&ref_green, &proc_green, 410, 230, true);
     let m_logo_b = compare_images(&ref_blue, &proc_blue, 410, 230, true);
     let m_logo_w = compare_images(&ref_ball_seg, &proc_ball_seg, 410, 230, true);
+    let m_logo_wa = compare_images(&ref_ball_achrom, &proc_ball_achrom, 410, 230, true);
     let m_logo_o = compare_images(&ref_other_seg, &proc_other_seg, 410, 230, true);
     let ref_other_px = ref_other_seg.iter().filter(|&&p| p != 0).count();
     let proc_other_px = proc_other_seg.iter().filter(|&&p| p != 0).count();
@@ -823,8 +834,8 @@ fn main() {
         m_logo_b.fg_mae, m_logo_b.iou, m_logo_b.boundary_f1
     );
     println!(
-        "  logo ball:     fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
-        m_logo_w.fg_mae, m_logo_w.iou, m_logo_w.boundary_f1
+        "  logo ball ROI: fg_MAE={:5.2} (ROI color error); achrom: fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        m_logo_w.fg_mae, m_logo_wa.fg_mae, m_logo_wa.iou, m_logo_wa.boundary_f1
     );
     println!(
         "  logo other:    fg_MAE={:5.2}, IoU={:.4}, bF1={:.4} (ref_px={ref_other_px}, proc_px={proc_other_px})",
@@ -901,14 +912,24 @@ fn main() {
     compare_audio("Audio whistle:", &sound[0], &proc_w);
     compare_audio("Audio hit:", &sound[1], &proc_h);
 
-    // 9. Benchmark
+    // 9. Benchmark (warmup + median of 5 runs of 500 frames)
     let t0 = Instant::now();
     let assets = GameAssets::generate();
     let gen_ms = t0.elapsed().as_secs_f64() * 1000.0;
-    let t1 = Instant::now();
-    for tick in 0..1000u32 {
+    for tick in 0..200u32 {
         fb_proc.draw_match(&assets, &m, &names, tick * 16);
     }
-    let render_us = t1.elapsed().as_secs_f64() * 1_000_000.0 / 1000.0;
-    println!("Benchmark:       generate()={gen_ms:.2} ms, draw_match()={render_us:.1} us/frame");
+    let mut run_us = Vec::with_capacity(5);
+    for run in 0..5u32 {
+        let t1 = Instant::now();
+        for tick in 0..500u32 {
+            fb_proc.draw_match(&assets, &m, &names, (run * 500 + tick) * 16);
+        }
+        run_us.push(t1.elapsed().as_secs_f64() * 1_000_000.0 / 500.0);
+    }
+    run_us.sort_by(|a, b| a.total_cmp(b));
+    let render_us = run_us[2];
+    println!(
+        "Benchmark:       generate()={gen_ms:.2} ms, draw_match()={render_us:.1} us/frame (median of 5x500 frames)"
+    );
 }
