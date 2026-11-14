@@ -717,33 +717,33 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
             let strokes = glyph_strokes(idx);
             let phase = idx as f32 * 0.73;
             let eval_d = |px: f32, py: f32| {
-                let sx = 12.0 + (px - 12.0) / 1.25;
-                dist_to_polylines(sx, py, strokes) - 1.55
+                // Stretch to fill the 24x24 cell and apply the sweeping ~25 deg italic slant
+                let sy = 12.0 + (py - 12.0) / 1.18;
+                let sx = 12.0 + (px - 12.0 - (12.0 - py) * 0.30) / 1.32;
+                dist_to_polylines(sx, sy, strokes) - 1.75
             };
             for by in 0..H {
                 let py = (H - 1 - by) as f32 + 0.5;
                 for x in 0..W {
                     let px = x as f32 + 0.5;
                     let d = eval_d(px, py);
-                    if d > 0.35 {
+                    if d > 0.45 {
                         continue;
                     }
-                    let cov = (1.0 - (d + 0.35) / 0.70).clamp(0.0, 1.0);
+                    let cov = (1.0 - (d + 0.45) / 0.90).clamp(0.0, 1.0);
                     let gx = eval_d(px + 0.5, py) - eval_d(px - 0.5, py);
                     let gy = eval_d(px, py + 0.5) - eval_d(px, py - 0.5);
-                    let bevel = ((-gx - gy) * 0.45).clamp(-0.30, 0.45);
+                    let bevel = ((-gx - gy) * 0.35).clamp(-0.12, 0.55);
+                    let core = (-d / 1.75).clamp(0.0, 1.0).powf(1.4) * 0.35;
 
                     let u = px / 24.0;
                     let v = py / 24.0;
-                    let r = 140.0 + 115.0 * (u * 2.4 + v * 1.4 + phase).sin();
-                    let g = 140.0 + 115.0 * (u * 1.9 - v * 2.2 + phase * 1.3 + 2.1).sin();
-                    let b = 140.0 + 115.0 * (-u * 2.1 + v * 1.8 + phase * 0.8 + 4.2).sin();
-                    let lit = (0.90 + bevel) * cov;
-                    let col = rgb(
-                        r * lit + bevel.max(0.0) * 110.0,
-                        g * lit + bevel.max(0.0) * 110.0,
-                        b * lit + bevel.max(0.0) * 110.0,
-                    );
+                    let r = 135.0 + 120.0 * (u * 2.4 + v * 1.4 + phase).sin();
+                    let g = 135.0 + 120.0 * (u * 1.9 - v * 2.2 + phase * 1.3 + 2.1).sin();
+                    let b = 135.0 + 120.0 * (-u * 2.1 + v * 1.8 + phase * 0.8 + 4.2).sin();
+                    let lit = (0.98 + bevel) * cov;
+                    let hi = (bevel.max(0.0) * 90.0 + core * 120.0) * cov;
+                    let col = rgb(r * lit + hi, g * lit + hi, b * lit + hi);
                     let sum = (col & 0xFF) + ((col >> 8) & 0xFF) + ((col >> 16) & 0xFF);
                     if sum >= 0x28 {
                         pixels[by * W + x] = col;
@@ -765,7 +765,7 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
                 }
             }
         } else {
-            // 53: Up arrow, 54: Down arrow
+            // 53: Up arrow, 54: Down arrow (full-width 24x24 rainbow arrows)
             let is_up = idx == 53;
             for by in 0..H {
                 let py = (H - 1 - by) as f32 + 0.5;
@@ -773,14 +773,14 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
                 for x in 0..W {
                     let px = x as f32 + 0.5;
                     let dx = (px - 12.0).abs();
-                    let in_head = (2.0..=11.0).contains(&y_dir) && dx <= (y_dir - 2.0) * 1.1;
-                    let in_shaft = (11.0..=21.5).contains(&y_dir) && dx <= 4.0;
+                    let in_head = (1.5..=12.0).contains(&y_dir) && dx <= (y_dir - 1.5) * 1.12;
+                    let in_shaft = (12.0..=22.5).contains(&y_dir) && dx <= 5.5;
                     if in_head || in_shaft {
                         let t = py / 24.0;
                         let (r, g, b) = if is_up {
-                            (255.0 * (1.0 - t * 0.5), 40.0 + 60.0 * (1.0 - t), 40.0 + 215.0 * t)
+                            (255.0 * (1.0 - t * 0.6), 30.0 + 90.0 * (1.0 - t), 30.0 + 225.0 * t)
                         } else {
-                            (220.0 * (1.0 - t), 220.0 * t, 255.0 * (1.0 - (t - 0.5).abs() * 1.5).max(0.2))
+                            (200.0 * (1.0 - t), 40.0 + 210.0 * t, 255.0 * (1.0 - (t - 0.35).abs() * 1.4).max(0.15))
                         };
                         pixels[by * W + x] = rgb(r, g, b);
                     }
@@ -820,10 +820,20 @@ pub fn generate_cursor() -> Sprite {
     let mut pixels = vec![0u32; W * H];
 
     let cursor_sdf = |px: f32, py: f32| -> f32 {
-        // Arrow head: tip (3, 1), right wing (33, 17), left wing (14, 32)
-        let d_head = point_in_triangle_dist(px, py, (3.0, 1.0), (33.0, 17.0), (14.0, 32.0));
-        // Tail stem from (21, 21) to (42, 43) with half-width 4.0
-        let d_stem = dist_to_segment(px, py, 21.0, 21.0, 42.0, 43.0) - 4.0;
+        // Arrow head: tip (3.0, 0.5), right wing (33.0, 16.5), left wing (13.5, 32.5)
+        let d_head = point_in_triangle_dist(px, py, (3.0, 0.5), (33.0, 16.5), (13.5, 32.5));
+        // Flat-ended rectangular stem along (20.5, 21.5) -> (39.5, 44.5), half-width 4.3
+        let (ax, ay) = (20.5_f32, 21.5_f32);
+        let (bx, by) = (39.5_f32, 44.5_f32);
+        let (vx, vy) = (bx - ax, by - ay);
+        let len = (vx * vx + vy * vy).sqrt();
+        let (ux, uy) = (vx / len, vy / len);
+        let (rx, ry) = (px - ax, py - ay);
+        let along = rx * ux + ry * uy;
+        let perp = (rx * -uy + ry * ux).abs();
+        let d_along = (-along).max(along - len);
+        let d_perp = perp - 4.3;
+        let d_stem = d_along.max(0.0).hypot(d_perp.max(0.0)) + d_along.max(d_perp).min(0.0);
         d_head.min(d_stem)
     };
 
@@ -838,14 +848,15 @@ pub fn generate_cursor() -> Sprite {
             let cov = (1.0 - (d + 0.2) / 0.8).clamp(0.0, 1.0);
             let gx = cursor_sdf(px + 0.5, py) - cursor_sdf(px - 0.5, py);
             let gy = cursor_sdf(px, py + 0.5) - cursor_sdf(px, py - 0.5);
-            // Lit from top-right so upper-right bevel gleams yellow-white
-            let bevel = ((gx - gy) * 0.65).clamp(-0.35, 1.0);
+            // Bright cream-yellow bevel along the upper-right face
+            let bevel = ((gx - gy) * 0.72).clamp(-0.35, 1.0);
+            let hi = (bevel.max(0.0)).powf(1.25);
             let mottle = fbm(px * 0.22, py * 0.22, 3);
-            let rim = (1.0 - (-d / 4.5).clamp(0.0, 1.0)).powi(2);
+            let rim = (1.0 - (-d / 3.8).clamp(0.0, 1.0)).powi(2);
 
-            let r = (25.0 + mottle * 65.0 + bevel.max(0.0) * 180.0 + rim * 70.0) * cov;
-            let g = (145.0 + mottle * 85.0 + bevel.max(0.0) * 95.0 + rim * 40.0) * cov;
-            let b = (18.0 + mottle * 35.0 + bevel.max(0.0) * 145.0) * cov;
+            let r = (55.0 + mottle * 70.0 + hi * 175.0 + rim * 35.0) * cov;
+            let g = (150.0 + mottle * 75.0 + hi * 95.0 + rim * 25.0) * cov;
+            let b = (40.0 + mottle * 45.0 + hi * 140.0 + rim * 20.0) * cov;
             let col = rgb(r, g, b);
             if col != 0 {
                 pixels[by * W + x] = col;
