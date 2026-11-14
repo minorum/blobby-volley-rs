@@ -8,7 +8,7 @@ use crate::audio::SoundEngine;
 use crate::net::{ClientStatePacket, NetClient, NetHost};
 use crate::render::{Framebuffer, CHAR_ADVANCE, HEIGHT, LINE_HEIGHT, WIDTH};
 use crate::settings::{key_display_name, GameSettings};
-use crate::sim::{MatchState, PlayerControl, PlayerInput, SimEvent};
+use crate::sim::{MatchState, PlayerControl, PlayerInput};
 
 const TICK_DURATION: Duration = Duration::from_millis(33);
 
@@ -1016,17 +1016,14 @@ impl App {
                 } else {
                     [inp0, inp1]
                 };
-                for ev in m.step(inputs, mx, mouse_down) {
-                    match ev {
-                        SimEvent::Whistle => {
-                            self.sound.play_wav(&self.assets.sounds[0]);
-                            sound_mask |= 1;
-                        }
-                        SimEvent::BallHit => {
-                            self.sound.play_wav(&self.assets.sounds[1]);
-                            sound_mask |= 2;
-                        }
-                    }
+                let ev = m.step(inputs, mx, mouse_down);
+                if ev.whistle {
+                    self.sound.play_wav(&self.assets.sounds[0]);
+                    sound_mask |= 1;
+                }
+                if ev.ball_hit {
+                    self.sound.play_wav(&self.assets.sounds[1]);
+                    sound_mask |= 2;
                 }
                 if let Some(host) = &self.net_host {
                     let r = &m.rally;

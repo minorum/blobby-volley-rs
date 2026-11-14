@@ -121,10 +121,10 @@ impl BallState {
 }
 
 /// Events emitted by a single simulation tick so the audio/UI layer stays decoupled.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SimEvent {
-    BallHit,
-    Whistle,
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SimEvents {
+    pub ball_hit: bool,
+    pub whistle: bool,
 }
 
 /// Deterministic xorshift32 PRNG replacing Delphi's `Random(n)` for reproducible simulation.
@@ -213,15 +213,15 @@ impl RallySim {
         human_inputs: [PlayerInput; 2],
         mouse_x: i32,
         mouse_clicked: bool,
-    ) -> (Vec<SimEvent>, Option<bool>) {
-        let mut events = Vec::new();
+    ) -> (SimEvents, Option<bool>) {
+        let mut events = SimEvents::default();
         self.ticks_since_start += 1;
 
         // 1. Apply human / mouse inputs
-        for i in 0..2 {
+        for (i, &human_input) in human_inputs.iter().enumerate() {
             match self.controls[i] {
                 PlayerControl::Keyboard => {
-                    self.players[i].input = human_inputs[i];
+                    self.players[i].input = human_input;
                 }
                 PlayerControl::Mouse => {
                     let target_x = (mouse_x >> 1) + (i as i32) * 400;
@@ -336,7 +336,7 @@ impl RallySim {
             if hit_now {
                 if !hit_prev {
                     self.players[i].hit_count += 1;
-                    events.push(SimEvent::BallHit);
+                    events.ball_hit = true;
                     if self.players[i].hit_count > 3 {
                         fault_occurred = true;
                         self.point_for_server = i != self.server;
@@ -363,7 +363,7 @@ impl RallySim {
         // 9. Whistle on rally end & 2-second cooldown (approx 60 ticks at 30 Hz)
         if self.rally_over {
             if self.rally_over_ticks == 0 {
-                events.push(SimEvent::Whistle);
+                events.whistle = true;
             }
             self.rally_over_ticks += 1;
             if self.rally_over_ticks > 60
@@ -550,18 +550,22 @@ impl RallySim {
 
             // Net vertical sides
             let left_edge = (self.ball.x / 32) - 32;
-            if left_edge < 0x19A && left_edge > 0x17B && self.ball.vx < 0 {
-                if (self.ball.y / 32) - 32 < 0x143 {
-                    self.ball.x = 0x3760;
-                    self.ball.vx = -self.ball.vx;
-                }
+            if left_edge < 0x19A
+                && left_edge > 0x17B
+                && self.ball.vx < 0
+                && (self.ball.y / 32) - 32 < 0x143
+            {
+                self.ball.x = 0x3760;
+                self.ball.vx = -self.ball.vx;
             }
             let right_edge = (self.ball.x / 32) + 32;
-            if right_edge < 0x1A5 && right_edge > 0x186 && self.ball.vx > 0 {
-                if (self.ball.y / 32) - 32 < 0x143 {
-                    self.ball.x = 0x2CA0;
-                    self.ball.vx = -self.ball.vx;
-                }
+            if right_edge < 0x1A5
+                && right_edge > 0x186
+                && self.ball.vx > 0
+                && (self.ball.y / 32) - 32 < 0x143
+            {
+                self.ball.x = 0x2CA0;
+                self.ball.vx = -self.ball.vx;
             }
 
             // Net top cap crossing guard (FUN_00444100)
@@ -617,17 +621,7 @@ impl RallySim {
             if self.ball.vx == 0 {
                 self.ball.vx = self.rng.next_i32(5) - 2;
             }
-            let mut guard = 0;
-            loop {
-                self.ball.x += self.ball.vx / 10;
-                self.ball.y += self.ball.vy / 10;
-                let ndx = (self.ball.x as f64) / 32.0 - 400.0;
-                let ndy = (self.ball.y as f64) / 32.0 - 329.0;
-                guard += 1;
-                if ndx * ndx + ndy * ndy > 1521.0 || guard > 100 {
-                    break;
-                }
-            }
+            separate_ball_from_circle(&mut self.ball, 400.0, 329.0, 1521.0);
         }
     }
 
@@ -657,18 +651,22 @@ impl RallySim {
         self.ball.vx = ((dx / dist) * 8.0 * 32.0).round() as i32;
         self.ball.vy = ((dy / dist) * 8.0 * 32.0).round() as i32;
 
-        let mut guard = 0;
-        loop {
-            self.ball.x += self.ball.vx / 10;
-            self.ball.y += self.ball.vy / 10;
-            let ndx = (self.ball.x as f64) / 32.0 - cx;
-            let ndy = (self.ball.y as f64) / 32.0 - cy;
-            guard += 1;
-            if ndx * ndx + ndy * ndy > sep_sq || guard > 100 {
-                break;
-            }
-        }
+        separate_ball_from_circle(&mut self.ball, cx, cy, sep_sq);
         new_hit
+    }
+}
+
+fn separate_ball_from_circle(ball: &mut BallState, cx: f64, cy: f64, sep_sq: f64) {
+    let mut guard = 0;
+    loop {
+        ball.x += ball.vx / 10;
+        ball.y += ball.vy / 10;
+        let ndx = (ball.x as f64) / 32.0 - cx;
+        let ndy = (ball.y as f64) / 32.0 - cy;
+        guard += 1;
+        if ndx * ndx + ndy * ndy > sep_sq || guard > 100 {
+            break;
+        }
     }
 }
 
@@ -694,9 +692,9 @@ impl MatchState {
         human_inputs: [PlayerInput; 2],
         mouse_x: i32,
         mouse_clicked: bool,
-    ) -> Vec<SimEvent> {
+    ) -> SimEvents {
         if self.winner.is_some() {
-            return Vec::new();
+            return SimEvents::default();
         }
         let (events, result) = self.rally.step(human_inputs, mouse_x, mouse_clicked);
         if let Some(point_for_server) = result {
@@ -794,7 +792,7 @@ mod tests {
         let mut hit_seen = false;
         for _ in 0..10 {
             let ev = m.step([PlayerInput::default(); 2], 0, false);
-            if ev.contains(&SimEvent::Whistle) {
+            if ev.whistle {
                 hit_seen = true;
                 break;
             }
@@ -856,5 +854,93 @@ mod tests {
         sim.step([PlayerInput::default(); 2], 0, false);
         assert!(sim.ball.vx > 0);
         assert!(sim.ball.x >= 0x400);
+    }
+
+    #[test]
+    fn first_rally_decides_serve_without_scoring() {
+        let mut m = MatchState::new([PlayerControl::Keyboard, PlayerControl::Keyboard], 5);
+        assert!(m.rally.is_first_rally);
+        let initial_server = m.rally.server;
+        m.rally.rally_over = true;
+        m.rally.point_for_server = false;
+        m.rally.rally_over_ticks = 61;
+        m.step([PlayerInput::default(); 2], 0, false);
+        assert!(!m.rally.is_first_rally);
+        assert_eq!(m.rally.server, 1 - initial_server);
+        assert_eq!(m.rally.players[0].score, 0);
+        assert_eq!(m.rally.players[1].score, 0);
+    }
+
+    #[test]
+    fn match_point_detection() {
+        let mut m = MatchState::new([PlayerControl::Keyboard, PlayerControl::Keyboard], 5);
+        m.rally.is_first_rally = false;
+        m.rally.server = 0;
+        m.rally.players[0].score = 14;
+        m.rally.players[1].score = 13;
+        assert!(m.is_match_point());
+
+        // Deuce 14-14 is not match point
+        m.rally.players[1].score = 14;
+        assert!(!m.is_match_point());
+
+        // Receiver at 14-13 is not match point
+        m.rally.server = 1;
+        assert!(!m.is_match_point());
+    }
+
+    #[test]
+    fn stuck_ball_over_40_frames_triggers_fault() {
+        let mut m = MatchState::new([PlayerControl::Keyboard, PlayerControl::Keyboard], 12);
+        m.rally.is_first_rally = false;
+        m.rally.server = 0;
+        m.rally.players[0].hit_prev_frame = true;
+        m.rally.players[0].stuck_frames = 40;
+        m.rally.ball.active = true;
+        m.rally.ball.x = 200 * 32;
+        m.rally.ball.y = 200 * 32;
+
+        let ev = m.step([PlayerInput::default(); 2], 0, false);
+        assert!(ev.whistle);
+        assert!(m.rally.rally_over);
+        assert!(!m.rally.point_for_server);
+    }
+
+    #[test]
+    fn net_side_and_top_cap_bounce() {
+        let mut sim = RallySim::new(
+            [PlayerControl::Keyboard, PlayerControl::Keyboard],
+            [0, 0],
+            0,
+            false,
+            1,
+        );
+        // Ball approaching net from right side below net top
+        sim.ball.active = true;
+        sim.ball.x = (0x199 + 32) * 32;
+        sim.ball.y = 200 * 32;
+        sim.ball.prev_x = sim.ball.x;
+        sim.ball.prev_y = sim.ball.y;
+        sim.ball.vx = -64;
+        sim.ball.vy = 0;
+        sim.step([PlayerInput::default(); 2], 0, false);
+        assert!(sim.ball.vx > 0);
+    }
+
+    #[test]
+    fn mouse_control_steers_player_toward_cursor() {
+        let mut sim = RallySim::new(
+            [PlayerControl::Mouse, PlayerControl::Keyboard],
+            [0, 0],
+            0,
+            false,
+            1,
+        );
+        // mouse_x = 600 -> target_x = 300 > p0.x (200) -> moves right
+        sim.step([PlayerInput::default(); 2], 600, false);
+        assert!(sim.players[0].x > 200);
+        // mouse_x = 100 -> target_x = 50 < p0.x -> moves left
+        sim.step([PlayerInput::default(); 2], 100, false);
+        assert!(sim.players[0].input.left);
     }
 }
