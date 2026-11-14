@@ -975,118 +975,172 @@ fn y_td(by: usize, h: usize) -> usize {
     h - 1 - by
 }
 
-fn ascii_strokes(ch: char) -> &'static [&'static [(f32, f32)]] {
-    match ch {
-        'A' => &[&[(0.1, 1.0), (0.5, 0.0), (0.9, 1.0)], &[(0.25, 0.65), (0.75, 0.65)]],
-        'B' => &[
-            &[(0.15, 1.0), (0.15, 0.0), (0.62, 0.0), (0.8, 0.08), (0.85, 0.22), (0.78, 0.38), (0.62, 0.47), (0.15, 0.47)],
-            &[(0.62, 0.47), (0.82, 0.56), (0.88, 0.72), (0.82, 0.9), (0.65, 1.0), (0.15, 1.0)],
-        ],
-        'D' => &[&[(0.15, 1.0), (0.15, 0.0), (0.55, 0.0), (0.78, 0.12), (0.88, 0.35), (0.88, 0.65), (0.78, 0.88), (0.55, 1.0), (0.15, 1.0)]],
-        'G' => &[&[(0.84, 0.22), (0.7, 0.05), (0.48, 0.0), (0.26, 0.1), (0.14, 0.35), (0.14, 0.7), (0.28, 0.92), (0.52, 1.0), (0.78, 0.9), (0.84, 0.56), (0.52, 0.56)]],
-        'M' => &[&[(0.1, 1.0), (0.15, 0.0), (0.5, 0.6), (0.85, 0.0), (0.9, 1.0)]],
-        'S' => &[&[(0.82, 0.16), (0.68, 0.03), (0.45, 0.0), (0.25, 0.1), (0.22, 0.28), (0.34, 0.42), (0.68, 0.52), (0.82, 0.68), (0.8, 0.88), (0.55, 1.0), (0.26, 0.95), (0.16, 0.82)]],
-        'V' => &[&[(0.12, 0.0), (0.5, 1.0), (0.88, 0.0)]],
-        'a' => &[
-            &[(0.24, 0.48), (0.45, 0.4), (0.68, 0.44), (0.75, 0.6), (0.75, 1.0)],
-            &[(0.75, 0.66), (0.38, 0.66), (0.2, 0.76), (0.2, 0.92), (0.38, 1.0), (0.65, 0.96), (0.75, 0.88)],
-        ],
-        'b' => &[
-            &[(0.2, 0.0), (0.2, 1.0)],
-            &[(0.2, 0.58), (0.38, 0.42), (0.62, 0.42), (0.78, 0.56), (0.8, 0.76), (0.7, 0.95), (0.45, 1.0), (0.2, 0.92)],
-        ],
-        'd' => &[
-            &[(0.8, 0.0), (0.8, 1.0)],
-            &[(0.8, 0.58), (0.62, 0.42), (0.38, 0.42), (0.22, 0.56), (0.2, 0.76), (0.3, 0.95), (0.55, 1.0), (0.8, 0.92)],
-        ],
-        'e' => &[&[(0.2, 0.68), (0.8, 0.68), (0.78, 0.5), (0.6, 0.4), (0.36, 0.42), (0.2, 0.6), (0.2, 0.82), (0.36, 0.98), (0.64, 1.0), (0.78, 0.92)]],
-        'f' => &[&[(0.75, 0.05), (0.52, 0.0), (0.42, 0.2), (0.42, 1.0)], &[(0.22, 0.45), (0.68, 0.45)]],
-        'g' => &[&[(0.78, 0.42), (0.45, 0.4), (0.24, 0.52), (0.2, 0.7), (0.32, 0.88), (0.6, 0.9), (0.78, 0.78), (0.78, 0.42), (0.75, 1.05), (0.6, 1.22), (0.36, 1.25), (0.2, 1.15)]],
-        'h' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.2, 0.58), (0.4, 0.42), (0.65, 0.42), (0.78, 0.58), (0.78, 1.0)]],
-        'i' => &[&[(0.5, 0.44), (0.5, 1.0)], &[(0.5, 0.16)]],
-        'k' => &[&[(0.2, 0.0), (0.2, 1.0)], &[(0.76, 0.42), (0.24, 0.72), (0.78, 1.0)]],
-        'l' => &[&[(0.5, 0.0), (0.5, 1.0)]],
-        'm' => &[&[(0.12, 1.0), (0.14, 0.42), (0.36, 0.42), (0.48, 0.54), (0.5, 1.0)], &[(0.48, 0.54), (0.66, 0.42), (0.82, 0.54), (0.86, 1.0)]],
-        'n' => &[&[(0.2, 1.0), (0.2, 0.42), (0.45, 0.42), (0.7, 0.46), (0.8, 0.6), (0.8, 1.0)]],
-        'o' => &[&[(0.5, 0.4), (0.72, 0.48), (0.8, 0.7), (0.72, 0.92), (0.5, 1.0), (0.28, 0.92), (0.2, 0.7), (0.28, 0.48), (0.5, 0.4)]],
-        'p' => &[&[(0.2, 0.42), (0.2, 1.25)], &[(0.2, 0.56), (0.42, 0.42), (0.68, 0.44), (0.8, 0.66), (0.72, 0.92), (0.45, 1.0), (0.2, 0.92)]],
-        'r' => &[&[(0.25, 1.0), (0.25, 0.42), (0.52, 0.42), (0.76, 0.5)]],
-        's' => &[&[(0.75, 0.48), (0.5, 0.4), (0.25, 0.48), (0.26, 0.62), (0.68, 0.74), (0.76, 0.88), (0.52, 1.0), (0.22, 0.92)]],
-        't' => &[&[(0.45, 0.1), (0.45, 0.9), (0.68, 1.0)], &[(0.22, 0.44), (0.72, 0.44)]],
-        'u' => &[&[(0.22, 0.42), (0.22, 0.86), (0.38, 1.0), (0.62, 0.98), (0.78, 0.82), (0.78, 0.42)]],
-        'v' => &[&[(0.18, 0.42), (0.5, 1.0), (0.82, 0.42)]],
-        'w' => &[&[(0.12, 0.42), (0.28, 1.0), (0.5, 0.56), (0.72, 1.0), (0.88, 0.42)]],
-        'y' => &[&[(0.2, 0.42), (0.48, 0.95)], &[(0.8, 0.42), (0.36, 1.22), (0.18, 1.22)]],
-        'z' => &[&[(0.2, 0.42), (0.8, 0.42), (0.2, 1.0), (0.8, 1.0)]],
-        '.' => &[&[(0.45, 0.92)]],
-        '-' => &[&[(0.25, 0.65), (0.75, 0.65)]],
-        '/' => &[&[(0.75, 0.1), (0.25, 1.0)]],
-        _ => &[],
+const ARIMO_REGULAR_TTF: &[u8] = include_bytes!("../assets/arimo/Arimo.ttf");
+const ARIMO_ITALIC_TTF: &[u8] = include_bytes!("../assets/arimo/Arimo-Italic.ttf");
+
+/// Separable Gaussian blur over a top-down `w x h` mask in `0.0..=1.0`.
+fn gaussian_blur_f32(src: &[f32], w: usize, h: usize, sigma: f32) -> Vec<f32> {
+    if sigma <= 0.05 {
+        return src.to_vec();
     }
+    let radius = (sigma * 3.0).ceil() as isize;
+    let mut kernel = Vec::with_capacity((radius * 2 + 1) as usize);
+    let mut sum = 0.0_f32;
+    let inv2s2 = 1.0 / (2.0 * sigma * sigma);
+    for k in -radius..=radius {
+        let v = (-(k * k) as f32 * inv2s2).exp();
+        kernel.push(v);
+        sum += v;
+    }
+    for v in &mut kernel {
+        *v /= sum;
+    }
+
+    let mut tmp = vec![0.0_f32; w * h];
+    for y in 0..h {
+        let row = y * w;
+        for x in 0..w {
+            let mut acc = 0.0_f32;
+            for (ki, &kv) in kernel.iter().enumerate() {
+                let sx = (x as isize + ki as isize - radius).clamp(0, w as isize - 1) as usize;
+                acc += src[row + sx] * kv;
+            }
+            tmp[row + x] = acc;
+        }
+    }
+
+    let mut dst = vec![0.0_f32; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            let mut acc = 0.0_f32;
+            for (ki, &kv) in kernel.iter().enumerate() {
+                let sy = (y as isize + ki as isize - radius).clamp(0, h as isize - 1) as usize;
+                acc += tmp[sy * w + x] * kv;
+            }
+            dst[y * w + x] = acc;
+        }
+    }
+    dst
 }
 
-fn card_char_advance(ch: char) -> f32 {
-    match ch {
-        'i' | 'l' | '.' => 0.32,
-        '/' => 0.38,
-        't' | 'f' | 'r' | '-' => 0.45,
-        ' ' => 0.42,
-        'w' => 0.74,
-        'm' | 'M' | 'W' => 0.90,
-        'A'..='Z' => 0.84,
-        _ => 0.69,
-    }
-}
-
-fn draw_card_text_into(
-    shadow_mask: &mut [f32],
-    fg_mask: &mut [f32],
+/// Rasterizes a text line with `swash` into a tight buffer, scales horizontally to `target_w`,
+/// and composites its max coverage into the top-down `dst` (`w x h`) mask at `(dst_x, dst_y)`.
+#[allow(clippy::too_many_arguments)]
+fn draw_arimo_line_into(
+    dst: &mut [f32],
     w: usize,
     h: usize,
-    x0: f32,
-    y0: f32,
-    cw: f32,
-    ch: f32,
-    slant: f32,
-    stroke_scale: f32,
+    shape_ctx: &mut swash::shape::ShapeContext,
+    scale_ctx: &mut swash::scale::ScaleContext,
+    font_bytes: &[u8],
+    px_size: f32,
+    weight: f32,
+    dst_x: isize,
+    dst_y: isize,
+    target_w: usize,
     text: &str,
 ) {
-    let stroke_r = (cw * stroke_scale).max(0.48);
-    let mut cx = x0;
+    let font = match swash::FontRef::from_index(font_bytes, 0) {
+        Some(f) => f,
+        None => return,
+    };
+    let mut shaper = shape_ctx
+        .builder(font)
+        .size(px_size)
+        .variations(&[("wght", weight)])
+        .build();
+    shaper.add_str(text);
 
-    for c in text.chars() {
-        let adv = cw * card_char_advance(c);
-        let strokes = ascii_strokes(c);
-        if strokes.is_empty() {
-            cx += adv;
-            continue;
+    let mut glyphs = Vec::new();
+    shaper.shape_with(|cluster| {
+        for g in cluster.glyphs {
+            glyphs.push((g.id, g.x, g.y, g.advance));
         }
-        let px0 = (cx - 5.0).floor().max(0.0) as usize;
-        let px1 = (cx + cw * 1.2 + 8.0).ceil().min((w - 1) as f32) as usize;
-        let py0 = (y0 - 4.0).floor().max(0.0) as usize;
-        let py1 = (y0 + ch * 1.3 + 7.0).ceil().min((h - 1) as f32) as usize;
+    });
 
-        for py in py0..=py1 {
-            let by = h - 1 - py;
-            for px in px0..=px1 {
-                let sx = (px as f32 - 2.8 - cx - (y0 + ch - py as f32) * slant) / cw;
-                let sy = (py as f32 - 2.8 - y0) / ch;
-                let d_sh = dist_to_polylines(sx, sy, strokes) * cw - stroke_r;
-                if d_sh < 3.0 {
-                    let a_sh = (1.0 - (d_sh + 0.5) / 3.5).clamp(0.0, 1.0) * 0.45;
-                    shadow_mask[by * w + px] = shadow_mask[by * w + px].max(a_sh);
-                }
+    let mut scaler = scale_ctx
+        .builder(font)
+        .size(px_size)
+        .variations(&[("wght", weight)])
+        .build();
 
-                let gx = (px as f32 - cx - (y0 + ch - py as f32) * slant) / cw;
-                let gy = (py as f32 - y0) / ch;
-                let d_fg = dist_to_polylines(gx, gy, strokes) * cw - stroke_r;
-                if d_fg < 0.8 {
-                    let cov = (1.0 - (d_fg + 0.25) / 1.05).clamp(0.0, 1.0);
-                    fg_mask[by * w + px] = fg_mask[by * w + px].max(cov);
-                }
+    let mut placed = Vec::new();
+    let mut pen_x = 0.0_f32;
+    let mut min_x = i32::MAX;
+    let mut min_y = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut max_y = i32::MIN;
+
+    for (gid, gx, gy, adv) in glyphs {
+        if let Some(img) = swash::scale::Render::new(&[swash::scale::Source::Outline])
+            .format(swash::zeno::Format::Alpha)
+            .render(&mut scaler, gid)
+        {
+            let x = (pen_x + gx).round() as i32 + img.placement.left;
+            let y = (-gy).round() as i32 - img.placement.top;
+            let gw = img.placement.width as i32;
+            let gh = img.placement.height as i32;
+            if gw > 0 && gh > 0 {
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x + gw);
+                max_y = max_y.max(y + gh);
+                placed.push((x, y, gw as usize, gh as usize, img.data));
             }
         }
-        cx += adv;
+        pen_x += adv;
+    }
+
+    if min_x >= max_x || min_y >= max_y {
+        return;
+    }
+
+    let bw = (max_x - min_x) as usize;
+    let bh = (max_y - min_y) as usize;
+    let mut line_buf = vec![0.0_f32; bw * bh];
+    for (gx, gy, gw, gh, data) in placed {
+        let ox = (gx - min_x) as usize;
+        let oy = (gy - min_y) as usize;
+        for row in 0..gh {
+            for col in 0..gw {
+                let a = data[row * gw + col] as f32 / 255.0;
+                let idx = (oy + row) * bw + (ox + col);
+                line_buf[idx] = line_buf[idx].max(a);
+            }
+        }
+    }
+
+    if target_w == 0 {
+        return;
+    }
+    let scale_x = bw as f32 / target_w as f32;
+    for row in 0..bh {
+        let py = dst_y + row as isize;
+        if py < 0 || py >= h as isize {
+            continue;
+        }
+        for tx in 0..target_w {
+            let px = dst_x + tx as isize;
+            if px < 0 || px >= w as isize {
+                continue;
+            }
+            let sx = (tx as f32 + 0.5) * scale_x - 0.5;
+            let x0 = sx.floor() as isize;
+            let frac = sx - x0 as f32;
+            let s0 = if x0 >= 0 && (x0 as usize) < bw {
+                line_buf[row * bw + x0 as usize]
+            } else {
+                0.0
+            };
+            let s1 = if x0 + 1 >= 0 && ((x0 + 1) as usize) < bw {
+                line_buf[row * bw + (x0 + 1) as usize]
+            } else {
+                0.0
+            };
+            let cov = s0 * (1.0 - frac) + s1 * frac;
+            let idx = (py as usize) * w + (px as usize);
+            dst[idx] = dst[idx].max(cov);
+        }
     }
 }
 
@@ -1127,12 +1181,12 @@ pub fn generate_ending_splash() -> Sprite {
             } else {
                 0.0
             };
-            let base = 228.0 - cliff - right_palms - sand_wash;
+            let base = 224.0 - cliff - right_palms - sand_wash;
 
             // Coherent rotated halftone screen matching graph.pak entry 90
             let v1 = (TAU * (0.269 * xf - 0.093 * yf) + 1.7433).cos();
             let v2 = (TAU * (0.087 * xf + 0.276 * yf) + 3.0886).cos();
-            let screen = (13.7 * v1 + 10.6 * v2).min(9.0);
+            let screen = (20.0 * v1 + 16.0 * v2).min(14.0);
 
             let lum = (base + screen).clamp(0.0, 238.0);
             let warm = if xf < 115.0 { 3.0 } else { 0.0 };
@@ -1140,22 +1194,61 @@ pub fn generate_ending_splash() -> Sprite {
         }
     }
 
-    let mut shadow_mask = vec![0.0_f32; W * H];
-    let mut fg_mask = vec![0.0_f32; W * H];
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 11.0, 13.0, 26.2, 26.5, 0.24, 0.064, "Blobby Volley");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 25.0, 94.0, 22.2, 20.0, 0.22, 0.062, "programmiert von");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 91.0, 131.0, 22.0, 21.0, 0.22, 0.062, "Daniel Skoraszewsky");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 28.0, 169.0, 21.4, 20.0, 0.22, 0.062, "Grafik von");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 100.0, 207.0, 21.6, 21.0, 0.22, 0.062, "Silvio Mummert");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 263.0, 15.3, 10.5, 0.03, 0.028, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text_into(&mut shadow_mask, &mut fg_mask, W, H, 24.0, 281.0, 15.7, 10.5, 0.03, 0.028, "www.t-online.de/home/mummertathome/");
+    let mut raw_fg = vec![0.0_f32; W * H];
+    let mut shape_ctx = swash::shape::ShapeContext::new();
+    let mut scale_ctx = swash::scale::ScaleContext::new();
 
-    for i in 0..(W * H) {
-        if shadow_mask[i] > 0.0 {
-            darken_pixel(&mut pixels[i], 1.0 - shadow_mask[i]);
+    let lines: &[(&[u8], f32, f32, isize, isize, usize, &str)] = &[
+        (ARIMO_ITALIC_TTF, 38.0, 450.0, 13, 13, 216, "Blobby Volley"),
+        (ARIMO_ITALIC_TTF, 30.0, 550.0, 26, 94, 230, "programmiert von"),
+        (ARIMO_ITALIC_TTF, 31.0, 450.0, 93, 131, 279, "Daniel Skoraszewsky"),
+        (ARIMO_ITALIC_TTF, 30.0, 450.0, 29, 170, 131, "Grafik von"),
+        (ARIMO_ITALIC_TTF, 31.0, 500.0, 100, 207, 205, "Silvio Mummert"),
+        (ARIMO_REGULAR_TTF, 15.0, 600.0, 23, 263, 334, "www.t-online.de/home/skoraszewsky/"),
+        (ARIMO_REGULAR_TTF, 15.0, 600.0, 23, 282, 360, "www.t-online.de/home/mummertathome/"),
+    ];
+    for &(font_bytes, px_size, weight, x, y, target_w, text) in lines {
+        draw_arimo_line_into(
+            &mut raw_fg,
+            W,
+            H,
+            &mut shape_ctx,
+            &mut scale_ctx,
+            font_bytes,
+            px_size,
+            weight,
+            x,
+            y,
+            target_w,
+            text,
+        );
+    }
+
+    let fg_blur = gaussian_blur_f32(&raw_fg, W, H, 0.75);
+    let glow_blur = gaussian_blur_f32(&raw_fg, W, H, 1.9);
+    let mut shifted = vec![0.0_f32; W * H];
+    for y in 2..H {
+        for x in 2..W {
+            shifted[y * W + x] = raw_fg[(y - 2) * W + (x - 2)];
         }
-        if fg_mask[i] > 0.0 {
-            blend_pixel(&mut pixels[i], 56.0, 56.0, 60.0, fg_mask[i]);
+    }
+    let shadow_blur = gaussian_blur_f32(&shifted, W, H, 1.6);
+
+    for y in 0..H {
+        let by = H - 1 - y;
+        for x in 0..W {
+            let td = y * W + x;
+            let idx = by * W + x;
+            let ga = (glow_blur[td] * 0.45).clamp(0.0, 1.0);
+            let sa = (shadow_blur[td] * 0.50).clamp(0.0, 1.0);
+            let dark_factor = (1.0 - ga) * (1.0 - sa);
+            if dark_factor < 1.0 {
+                darken_pixel(&mut pixels[idx], dark_factor);
+            }
+            let fa = fg_blur[td].clamp(0.0, 1.0);
+            if fa > 0.0 {
+                blend_pixel(&mut pixels[idx], 38.0, 41.0, 45.0, fa);
+            }
         }
     }
 
