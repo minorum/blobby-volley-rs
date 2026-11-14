@@ -1082,3 +1082,63 @@ pub fn generate_ending_splash() -> BmpImage {
         pixels,
     }
 }
+
+fn encode_wav_u8_mono(sample_rate: u32, samples: &[u8]) -> Vec<u8> {
+    let data_len = samples.len() as u32;
+    let riff_len = 36 + data_len;
+    let mut wav = Vec::with_capacity(44 + samples.len());
+    wav.extend_from_slice(b"RIFF");
+    wav.extend_from_slice(&riff_len.to_le_bytes());
+    wav.extend_from_slice(b"WAVE");
+    wav.extend_from_slice(b"fmt ");
+    wav.extend_from_slice(&16u32.to_le_bytes()); // PCM chunk size
+    wav.extend_from_slice(&1u16.to_le_bytes()); // PCM format
+    wav.extend_from_slice(&1u16.to_le_bytes()); // mono
+    wav.extend_from_slice(&sample_rate.to_le_bytes());
+    wav.extend_from_slice(&sample_rate.to_le_bytes()); // byte rate (8-bit mono)
+    wav.extend_from_slice(&1u16.to_le_bytes()); // block align
+    wav.extend_from_slice(&8u16.to_le_bytes()); // bits per sample
+    wav.extend_from_slice(b"data");
+    wav.extend_from_slice(&data_len.to_le_bytes());
+    wav.extend_from_slice(samples);
+    wav
+}
+
+/// Synthesizes the referee whistle WAV (44.1 kHz, 8-bit mono, ~0.45s).
+pub fn generate_whistle_wav() -> Vec<u8> {
+    const SR: u32 = 44100;
+    const N: usize = 20000;
+    let mut samples = Vec::with_capacity(N);
+    let mut phase = 0.0_f32;
+    for i in 0..N {
+        let t = i as f32 / SR as f32;
+        let dur = N as f32 / SR as f32;
+        let env = (t / 0.015).min(1.0) * ((dur - t) / 0.045).clamp(0.0, 1.0);
+        // Pea-whistle trill at ~34 Hz modulating ~2600 Hz carrier
+        let trill = (t * 34.0 * std::f32::consts::TAU).sin();
+        let freq = 2595.0 + 75.0 * trill;
+        phase += freq * std::f32::consts::TAU / SR as f32;
+        let amp = 0.72 + 0.28 * trill;
+        let sig = phase.sin() * amp * env;
+        samples.push((128.0 + sig * 96.0).round().clamp(0.0, 255.0) as u8);
+    }
+    encode_wav_u8_mono(SR, &samples)
+}
+
+/// Synthesizes the ball hit / menu click WAV (44.1 kHz, 8-bit mono, ~0.055s).
+pub fn generate_hit_wav() -> Vec<u8> {
+    const SR: u32 = 44100;
+    const N: usize = 2408;
+    let mut samples = Vec::with_capacity(N);
+    let mut phase = 0.0_f32;
+    for i in 0..N {
+        let t = i as f32 / SR as f32;
+        let env = (-t * 58.0).exp() * (t / 0.002).min(1.0);
+        let freq = 95.0 + 90.0 * (-t * 80.0).exp();
+        phase += freq * std::f32::consts::TAU / SR as f32;
+        let transient = if i < 90 { (i as f32 * 0.7).sin() * 0.35 } else { 0.0 };
+        let sig = (phase.sin() * 0.85 + transient) * env;
+        samples.push((128.0 + sig * 105.0).round().clamp(0.0, 255.0) as u8);
+    }
+    encode_wav_u8_mono(SR, &samples)
+}

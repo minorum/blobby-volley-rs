@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::pak::{load_pak_file, BmpImage};
+use crate::pak::BmpImage;
 use crate::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
     generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
-    generate_title_logo,
+    generate_hit_wav, generate_title_logo, generate_whistle_wav,
 };
 
 pub const BLOBBY_COLORS: [u32; 8] = [
@@ -62,6 +62,68 @@ impl LocalizedText {
         Self { sections }
     }
 
+    pub fn french() -> Self {
+        Self::from_pairs(&[
+            ("@main", &["Jouer", "Jeu en reseau", "Statistiques", "Reglages", "Deutsch", "Fin"]),
+            ("@settings", &["< Joueur 1", "> Joueur 2", "Nom:", "Controle:", "definir Touches ...", "Son:", "Ok", "Clavier", "Souris", "Comp.(facile)", "Comp.(moyen)", "Comp.(difficile)", "marche", "arret"]),
+            ("@keydef", &["Joueur 1 (Host)", "Joueur 2 (invite)", " gauche", " droite", " Saut"]),
+            ("@win", &["gagne"]),
+            ("@nachfrage", &["Vraiment\\nquitter\\nle jeu?"]),
+            ("@names", &["Adam", "Bert", "Carl"]),
+            ("@stats", &["Nom", "Jr.", "ga.", "Points", "²", "³", "Ok", "Jeu contre joueur", "Jeu contre Adam (facile)", "Jeu contre Bert (moyen)", "Jeu contre Carl (difficile)", "Tout les jeux"]),
+            ("@mpsettings", &["Options-Multijoueur", "Jouer reseau...", "Jouer INVITE...", "retour"]),
+            ("@hostsettings", &["Reglages serveur", "Nom du jeu:", "controles:", "jouer!", "retour"]),
+            ("@clientsettings", &["reglages invite", "Host-IP:", "controles:", "Chercher jeux", "retour"]),
+            ("@clientgamelist", &["jeux trouves:", "retour", "pas de jeux trouves"]),
+            ("@hostwaiting", &["attente invite...", "(Annuler avec ESC)"]),
+        ])
+    }
+
+    pub fn german() -> Self {
+        Self::from_pairs(&[
+            ("@main", &["Spiel starten", "Netzwerkspiel", "Statistik", "Einstellungen", "English Please", "Ende"]),
+            ("@settings", &["< Spieler 1", "> Spieler 2", "Name:", "Steuerung:", "Tasten definieren...", "Sound:", "Ok", "Tastatur", "Maus", "Comp.(leicht)", "Comp.(mittel)", "Comp.(schwer)", "an", "aus"]),
+            ("@keydef", &["Spieler 1 (Host)", "Spieler 2 (Gast)", " links", " rechts", " Sprung"]),
+            ("@win", &["gewinnt"]),
+            ("@nachfrage", &["Spiel\\nwirklich\\nbeenden?"]),
+            ("@names", &["Adam", "Bert", "Carl"]),
+            ("@stats", &["Name", "Sp.", "gew.", "Punkte", "²", "³", "Ok", "Spiele gegen Menschen", "Spiele gegen Adam (leicht)", "Spiele gegen Bert (mittel)", "Spiele gegen Carl (schwer)", "alle Spiele"]),
+            ("@mpsettings", &["Multiplayer-Optionen", "Ein Spiel hosten...", "Als Gast spielen...", "zurück"]),
+            ("@hostsettings", &["Host-Einstellungen", "Name des Spiels:", "Steuerung:", "Spiel beginnen!", "Zurück"]),
+            ("@clientsettings", &["Gast-Einstellungen", "Host-IP:", "Steuerung:", "Spiele suchen", "Zurück"]),
+            ("@clientgamelist", &["Gefundene Spiele:", "zurück", "keine Spiele gefunden"]),
+            ("@hostwaiting", &["Warte auf einen Gast...", "(Abbruch mit ESC)"]),
+        ])
+    }
+
+    pub fn english() -> Self {
+        Self::from_pairs(&[
+            ("@main", &["Start Game", "Network Match", "Statistics", "Settings", "Francais", "Quit"]),
+            ("@settings", &["< Player 1", "> Player 2", "Name:", "Control:", "Define keys...", "Sound:", "Ok", "Keyboard", "Mouse", "Comp.(easy)", "Comp.(avg.)", "Comp.(hard)", "on", "off"]),
+            ("@keydef", &["Player 1 (host)", "Player 2 (client)", " left", " right", " jump"]),
+            ("@win", &["wins"]),
+            ("@nachfrage", &["Really quit?"]),
+            ("@names", &["Adam", "Bert", "Carl"]),
+            ("@stats", &["name", "gms", "won", "score", "²", "³", "ok", "matches against humans", "matches against Adam (easy)", "matches against Bert (avg.)", "matches against Carl (hard)", "all matches"]),
+            ("@mpsettings", &["Multiplayer Options", "Host a game...", "Join a game...", "Back"]),
+            ("@hostsettings", &["Host Settings", "Game name:", "Control:", "Start Hosting!", "Back"]),
+            ("@clientsettings", &["Client Settings", "Host-IP:", "Control:", "Find Sessions", "Back"]),
+            ("@clientgamelist", &["sessions found:", "back", "no sessions found."]),
+            ("@hostwaiting", &["Waiting for Client... ", "(press ESC to cancel)"]),
+        ])
+    }
+
+    fn from_pairs(pairs: &[(&str, &[&str])]) -> Self {
+        let mut sections = HashMap::new();
+        for &(k, vals) in pairs {
+            sections.insert(
+                k.to_string(),
+                vals.iter().map(|&s| s.to_string()).collect(),
+            );
+        }
+        Self { sections }
+    }
+
     pub fn get(&self, section: &str, idx: usize) -> &str {
         self.sections
             .get(section)
@@ -88,18 +150,14 @@ pub struct GameAssets {
     pub texts: [LocalizedText; 3],          // 0: FR, 1: DE, 2: EN
 }
 
-pub fn find_asset_dir() -> PathBuf {
+pub fn find_settings_dir() -> PathBuf {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    if cwd.join("graph.pak").exists() {
+    if cwd.join("bv_settings.txt").exists() {
         return cwd;
     }
     let orig = cwd.join("original");
-    if orig.join("graph.pak").exists() {
+    if orig.join("bv_settings.txt").exists() {
         return orig;
-    }
-    let manifest_orig = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("original");
-    if manifest_orig.join("graph.pak").exists() {
-        return manifest_orig;
     }
     cwd
 }
@@ -119,56 +177,30 @@ pub fn tint_pixel(color: u32, pixel: u32) -> u32 {
 }
 
 impl GameAssets {
-    pub fn load(dir: &Path) -> Result<Self, String> {
-        let graph = load_pak_file(&dir.join("graph.pak"))?;
-        if graph.len() < 91 {
-            return Err(format!("Unexpected graph.pak entry count: {}", graph.len()));
-        }
-
-        // Background (procedural 800x600 top-down beach scene)
+    /// Generates all game graphics, audio, and localization tables procedurally
+    /// with zero runtime dependency on external `.pak` files.
+    pub fn generate() -> Self {
         let bg = generate_background();
         let bg_dark: Vec<u32> = bg.iter().map(|&p| (p & 0x00F8F8F8) >> 3).collect();
-
-        // Ball frames (procedural, 16 frames of 64x64)
         let ball_frames = generate_ball_frames();
-
-        // Blobby base frames (procedural, 5 frames of 148x101)
         let blobby_base = generate_blobby_frames();
-
-        // Font glyphs (procedural, 55 glyphs of 24x24)
         let font_glyphs = generate_font_glyphs(&blobby_base[0]);
         let font_icon_base = font_glyphs[0x33].clone();
-
-        // Blobby shadows (procedural, 10 frames of 129x25)
         let blobby_shadows = generate_blobby_shadows(&blobby_base);
-
-        // Ball shadow (procedural, 69x17)
         let ball_shadow = generate_ball_shadow();
-
-        // Cursor (48x48), title logo (410x230), ending splash (400x300) - procedural
         let cursor = generate_cursor();
         let title_logo = generate_title_logo();
         let ending_splash = generate_ending_splash();
 
-        // Sounds
-        let sound_entries = load_pak_file(&dir.join("sound.pak"))?;
-        if sound_entries.len() < 2 {
-            return Err("sound.pak has fewer than 2 entries".to_string());
-        }
         let sounds = [
-            Arc::from(sound_entries[0].as_slice()),
-            Arc::from(sound_entries[1].as_slice()),
+            Arc::from(generate_whistle_wav().into_boxed_slice()),
+            Arc::from(generate_hit_wav().into_boxed_slice()),
         ];
 
-        // Texts
-        let text_entries = load_pak_file(&dir.join("text.pak"))?;
-        if text_entries.len() < 3 {
-            return Err("text.pak has fewer than 3 entries".to_string());
-        }
         let texts = [
-            LocalizedText::parse(&text_entries[0]),
-            LocalizedText::parse(&text_entries[1]),
-            LocalizedText::parse(&text_entries[2]),
+            LocalizedText::french(),
+            LocalizedText::german(),
+            LocalizedText::english(),
         ];
 
         let mut assets = Self {
@@ -189,7 +221,7 @@ impl GameAssets {
         };
         assets.recolor_player(0, 0);
         assets.recolor_player(1, 3);
-        Ok(assets)
+        assets
     }
 
     pub fn recolor_player(&mut self, player_idx: usize, color_idx: usize) {
