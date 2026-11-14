@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::pak::{load_pak_file, parse_bmp, BmpImage};
 use crate::procedural::{
-    generate_ball_frames, generate_ball_shadow, generate_blobby_frames, generate_blobby_shadows,
+    generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
+    generate_blobby_shadows,
 };
 
 pub const BLOBBY_COLORS: [u32; 8] = [
@@ -124,24 +124,8 @@ impl GameAssets {
             return Err(format!("Unexpected graph.pak entry count: {}", graph.len()));
         }
 
-        // Background (with optional bvbg.bmp override if 800x600)
-        let mut bg_img = parse_bmp(&graph[0])?;
-        let bvbg_path = dir.join("bvbg.bmp");
-        if bvbg_path.exists() {
-            if let Ok(bytes) = fs::read(&bvbg_path) {
-                if let Ok(custom) = parse_bmp(&bytes) {
-                    if custom.width == 800 && custom.height == 600 {
-                        bg_img = custom;
-                    }
-                }
-            }
-        }
-        // Flip background to top-down once so per-frame copy_bg is a single memcpy.
-        let mut bg = vec![0u32; 800 * 600];
-        for y in 0..600 {
-            bg[(599 - y) * 800..(600 - y) * 800]
-                .copy_from_slice(&bg_img.pixels[y * 800..(y + 1) * 800]);
-        }
+        // Background (procedural 800x600 top-down beach scene)
+        let bg = generate_background();
         let bg_dark: Vec<u32> = bg.iter().map(|&p| (p & 0x00F8F8F8) >> 3).collect();
 
         // Ball frames (procedural, 16 frames of 64x64)

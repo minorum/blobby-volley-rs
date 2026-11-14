@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use blobby_volley_rs::pak::{load_pak_file, parse_bmp, BmpImage};
 use blobby_volley_rs::procedural::{
-    generate_ball_frames, generate_ball_shadow, generate_blobby_frames, generate_blobby_shadows,
+    generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
+    generate_blobby_shadows,
 };
 
 struct Metrics {
@@ -175,4 +176,21 @@ fn main() {
         bshadow_iou / 10.0,
         m_bsh.iou
     );
+
+    // 4. Background (0, 800x600)
+    let ref_bg = parse_bmp(&graph[0]).unwrap();
+    let proc_bg_td = generate_background();
+    let mut proc_bg_bu = vec![0u32; 800 * 600];
+    for y in 0..600 {
+        proc_bg_bu[(599 - y) * 800..(600 - y) * 800]
+            .copy_from_slice(&proc_bg_td[y * 800..(y + 1) * 800]);
+    }
+    let proc_bg = BmpImage {
+        width: 800,
+        height: 600,
+        pixels: proc_bg_bu,
+    };
+    let m_bg = compare_images(&ref_bg, &proc_bg);
+    save_side_by_side(&out_dir.join("bg.ppm"), &ref_bg, &proc_bg);
+    println!("Background: MAE={:.2}, PSNR={:.2} dB", m_bg.mae, m_bg.psnr);
 }

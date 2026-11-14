@@ -261,3 +261,348 @@ pub fn generate_blobby_shadows(blobby_base: &[BmpImage]) -> Vec<BmpImage> {
     }
     shadows
 }
+
+#[inline]
+fn hash2(ix: i32, iy: i32) -> f32 {
+    let mut n = (ix.wrapping_mul(374761393))
+        .wrapping_add(iy.wrapping_mul(668265263))
+        .wrapping_add(1442695041);
+    n = (n ^ (n >> 13)).wrapping_mul(1274126177);
+    ((n ^ (n >> 16)) as u32 & 0xFFFF) as f32 / 65535.0
+}
+
+fn value_noise(x: f32, y: f32) -> f32 {
+    let ix = x.floor() as i32;
+    let iy = y.floor() as i32;
+    let fx = x - ix as f32;
+    let fy = y - iy as f32;
+    let ux = fx * fx * (3.0 - 2.0 * fx);
+    let uy = fy * fy * (3.0 - 2.0 * fy);
+    let a = hash2(ix, iy);
+    let b = hash2(ix + 1, iy);
+    let c = hash2(ix, iy + 1);
+    let d = hash2(ix + 1, iy + 1);
+    (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy
+}
+
+fn fbm(mut x: f32, mut y: f32, octaves: usize) -> f32 {
+    let mut sum = 0.0_f32;
+    let mut amp = 0.5_f32;
+    let mut norm = 0.0_f32;
+    for _ in 0..octaves {
+        sum += amp * value_noise(x, y);
+        norm += amp;
+        x *= 2.03;
+        y *= 2.01;
+        amp *= 0.5;
+    }
+    sum / norm
+}
+
+#[inline]
+fn rgb(r: f32, g: f32, b: f32) -> u32 {
+    let rr = r.round().clamp(0.0, 255.0) as u32;
+    let gg = g.round().clamp(0.0, 255.0) as u32;
+    let bb = b.round().clamp(0.0, 255.0) as u32;
+    (rr << 16) | (gg << 8) | bb
+}
+
+#[inline]
+fn blend_pixel(dst: &mut u32, r: f32, g: f32, b: f32, alpha: f32) {
+    let a = alpha.clamp(0.0, 1.0);
+    let dr = ((*dst >> 16) & 0xFF) as f32;
+    let dg = ((*dst >> 8) & 0xFF) as f32;
+    let db = (*dst & 0xFF) as f32;
+    *dst = rgb(dr + (r - dr) * a, dg + (g - dg) * a, db + (b - db) * a);
+}
+
+#[inline]
+fn darken_pixel(dst: &mut u32, factor: f32) {
+    let dr = ((*dst >> 16) & 0xFF) as f32;
+    let dg = ((*dst >> 8) & 0xFF) as f32;
+    let db = (*dst & 0xFF) as f32;
+    *dst = rgb(dr * factor, dg * factor, db * factor);
+}
+
+fn draw_disc(buf: &mut [u32], w: usize, h: usize, cx: f32, cy: f32, r: f32, col: u32) {
+    let x0 = (cx - r).floor().max(0.0) as usize;
+    let x1 = (cx + r).ceil().min((w - 1) as f32) as usize;
+    let y0 = (cy - r).floor().max(0.0) as usize;
+    let y1 = (cy + r).ceil().min((h - 1) as f32) as usize;
+    let r2 = r * r;
+    for y in y0..=y1 {
+        let dy = y as f32 - cy;
+        for x in x0..=x1 {
+            let dx = x as f32 - cx;
+            if dx * dx + dy * dy <= r2 {
+                buf[y * w + x] = col;
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_palm_tree(
+    buf: &mut [u32],
+    w: usize,
+    h: usize,
+    bx: f32,
+    by: f32,
+    mx: f32,
+    my: f32,
+    tx: f32,
+    ty: f32,
+    base_r: f32,
+    top_r: f32,
+    frond_len: f32,
+    seed: f32,
+) {
+    // Trunk along quadratic Bezier
+    let steps = 260;
+    for i in 0..=steps {
+        let t = i as f32 / steps as f32;
+        let it = 1.0 - t;
+        let x = it * it * bx + 2.0 * it * t * mx + t * t * tx;
+        let y = it * it * by + 2.0 * it * t * my + t * t * ty;
+        let r = base_r + (top_r - base_r) * t;
+        let ring = ((t * 42.0).sin() * 0.5 + 0.5) * 22.0;
+        let x0 = (x - r).floor().max(0.0) as usize;
+        let x1 = (x + r).ceil().min((w - 1) as f32) as usize;
+        let y0 = (y - r).floor().max(0.0) as usize;
+        let y1 = (y + r).ceil().min((h - 1) as f32) as usize;
+        for py in y0..=y1 {
+            let dy = py as f32 - y;
+            for px in x0..=x1 {
+                let dx = px as f32 - x;
+                if dx * dx + dy * dy <= r * r {
+                    let lit = (0.5 - dx / (2.0 * r.max(1.0))).clamp(0.0, 1.0);
+                    let cr = 46.0 + lit * 44.0 + ring * 0.7;
+                    let cg = 34.0 + lit * 30.0 + ring * 0.5;
+                    let cb = 24.0 + lit * 20.0 + ring * 0.3;
+                    buf[py * w + px] = rgb(cr, cg, cb);
+                }
+            }
+        }
+    }
+
+    // Feathery palm fronds radiating from crown (tx, ty)
+    let num_fronds = 13;
+    for f in 0..num_fronds {
+        let ang = (f as f32 / num_fronds as f32) * std::f32::consts::TAU + seed;
+        let dir_x = ang.cos();
+        let dir_y = ang.sin() * 0.72 - 0.16;
+        let len = frond_len * (0.85 + 0.30 * ((f as f32 * 2.1 + seed).sin() * 0.5 + 0.5));
+        let droop = 28.0 + 22.0 * (1.0 - dir_y.abs());
+
+        let spine_steps = 52;
+        for s in 2..=spine_steps {
+            let t = s as f32 / spine_steps as f32;
+            let sx = tx + dir_x * len * t;
+            let sy = ty + dir_y * len * t + droop * t * t;
+            let leaf_len = (1.0 - (t - 0.35).abs() * 1.1).clamp(0.18, 1.0) * (len * 0.28);
+            let shade = if dir_y < 0.0 { 1.0 } else { 0.72 };
+
+            draw_disc(
+                buf,
+                w,
+                h,
+                sx,
+                sy,
+                1.3,
+                rgb(12.0 * shade, 72.0 * shade, 8.0),
+            );
+
+            // Leaflets on both sides of spine
+            let perp_x = -dir_y;
+            let perp_y = dir_x;
+            for side in [-1.0_f32, 1.0_f32] {
+                let lx_dir = (perp_x * side * 0.80 + dir_x * 0.50) * leaf_len;
+                let ly_dir = (perp_y * side * 0.55 + dir_y * 0.35 + 0.48) * leaf_len;
+                let l_steps = 16;
+                for ls in 1..=l_steps {
+                    let lt = ls as f32 / l_steps as f32;
+                    let px = sx + lx_dir * lt;
+                    let py = sy + ly_dir * lt + 3.5 * lt * lt;
+                    let ix = px.round() as i32;
+                    let iy = py.round() as i32;
+                    if (0..w as i32).contains(&ix) && (0..h as i32).contains(&iy) {
+                        let g = (52.0 + 96.0 * (1.0 - lt * 0.45) * shade).clamp(0.0, 255.0);
+                        let r = (6.0 + 26.0 * (1.0 - lt) * shade).clamp(0.0, 255.0);
+                        buf[iy as usize * w + ix as usize] = rgb(r, g, 6.0);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn draw_palm_shadow(buf: &mut [u32], w: usize, h: usize, cx: f32, cy: f32, rx: f32, ry: f32) {
+    let x0 = (cx - rx).floor().max(0.0) as usize;
+    let x1 = (cx + rx).ceil().min((w - 1) as f32) as usize;
+    let y0 = (cy - ry).floor().max(0.0) as usize;
+    let y1 = (cy + ry).ceil().min((h - 1) as f32) as usize;
+    for y in y0..=y1 {
+        let dy = (y as f32 - cy) / ry;
+        for x in x0..=x1 {
+            let dx = (x as f32 - cx) / rx;
+            let r = (dx * dx + dy * dy).sqrt();
+            if r > 1.0 {
+                continue;
+            }
+            let ang = dy.atan2(dx);
+            let n = fbm(x as f32 * 0.04, y as f32 * 0.10, 2);
+            let frond_wave = (ang * 7.0 + n * 2.5).cos() * 0.5 + 0.5;
+            let core = (1.0 - r / 0.30).clamp(0.0, 1.0);
+            let mask = (core + (1.0 - r) * frond_wave * (0.45 + 0.55 * n)).clamp(0.0, 1.0);
+            if mask > 0.25 {
+                darken_pixel(&mut buf[y * w + x], 1.0 - 0.55 * mask);
+            }
+        }
+    }
+}
+
+/// Generates the 800x600 top-down beach background procedurally.
+pub fn generate_background() -> Vec<u32> {
+    const W: usize = 800;
+    const H: usize = 600;
+    let mut buf = vec![0u32; W * H];
+
+    let shoreline = |x: f32| -> f32 {
+        338.0 - 19.0 * (x / 520.0).clamp(0.0, 1.0)
+            + 3.0 * (x * 0.014).sin()
+            + 1.5 * (x * 0.037).cos()
+    };
+
+    // 1. Sky, Ocean, and Sand base layers
+    for y in 0..H {
+        let yf = y as f32;
+        for x in 0..W {
+            let xf = x as f32;
+            let sh_y = shoreline(xf);
+            let col = if yf < 285.0 {
+                // Deep cobalt sky with sparse wispy fBm clouds
+                let t = yf / 285.0;
+                let cloud = fbm(xf * 0.007 + 2.1, yf * 0.022 + 0.4, 4);
+                let wisp = ((cloud - 0.54) * 2.6).clamp(0.0, 1.0);
+                let side_bright = (xf / 800.0) * 16.0;
+                let r = 8.0 + t * 44.0 + side_bright + wisp * 82.0;
+                let g = 34.0 + t * 56.0 + side_bright * 0.8 + wisp * 78.0;
+                let b = 212.0 + t * 24.0 + wisp * 24.0;
+                rgb(r, g, b)
+            } else if yf < sh_y {
+                // Ocean with horizon darkening and horizontal wave ripples
+                let depth = ((yf - 285.0) / (sh_y - 285.0).max(1.0)).clamp(0.0, 1.0);
+                let ripple = fbm(xf * 0.055, yf * 0.42, 3);
+                let glint = if ripple > 0.72 && depth > 0.25 {
+                    (ripple - 0.72) * 290.0
+                } else {
+                    0.0
+                };
+                let horiz = if yf < 289.0 { 0.72 } else { 1.0 };
+                let r = (66.0 + depth * 32.0 + (ripple - 0.5) * 44.0 + glint) * horiz;
+                let g = (94.0 + depth * 38.0 + (ripple - 0.5) * 52.0 + glint) * horiz;
+                let b = (238.0 + depth * 14.0 + (ripple - 0.5) * 16.0 + glint * 0.4) * horiz;
+                rgb(r, g, b)
+            } else {
+                // Sandy beach with subtle shading and grain
+                let sand_t = ((yf - sh_y) / (600.0 - sh_y)).clamp(0.0, 1.0);
+                let grain = (hash2(x as i32, y as i32) - 0.5) * 12.0;
+                let dune = (fbm(xf * 0.006, yf * 0.012, 3) - 0.5) * 14.0;
+                let r = 174.0 + sand_t * 14.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
+                let g = 160.0 + sand_t * 12.0 + grain + dune - (1.0 - xf / 800.0) * 16.0;
+                let b = 90.0 + sand_t * 8.0 + grain * 0.7 + dune * 0.6;
+                rgb(r, g, b)
+            };
+            buf[y * W + x] = col;
+        }
+    }
+
+    // 2. Distant left cliffs and sea stack
+    for x in 0..265 {
+        let xf = x as f32;
+        let top_y = if x < 198 {
+            170.0 + xf * 0.21 + (fbm(xf * 0.08, 1.0, 3) - 0.5) * 18.0
+        } else if x < 208 {
+            170.0 + 198.0 * 0.21 + (xf - 198.0) * 8.5
+        } else if x >= 224 && x <= 258 {
+            let d = ((xf - 241.0) / 17.0).abs();
+            260.0 + d * d * 32.0 + (fbm(xf * 0.2, 2.0, 2) - 0.5) * 6.0
+        } else {
+            999.0
+        };
+        let bot_y = 294.0 - (xf / 265.0) * 4.0;
+        let y0 = (top_y.floor() as usize).min(H);
+        let y1 = (bot_y.ceil() as usize).min(H);
+        for y in y0..y1 {
+            let stria = fbm(xf * 0.16, y as f32 * 0.025, 3);
+            let lit = if x > 224 { 0.85 + 0.25 * (241.0 - xf) / 17.0 } else { 0.9 };
+            let cr = (62.0 + stria * 58.0) * lit;
+            let cg = (54.0 + stria * 52.0) * lit;
+            let cb = (48.0 + stria * 46.0) * lit;
+            buf[y * W + x] = rgb(cr, cg, cb);
+        }
+    }
+
+    // 3. Palm shadows on sand
+    draw_palm_shadow(&mut buf, W, H, 165.0, 378.0, 145.0, 38.0);
+    draw_palm_shadow(&mut buf, W, H, 655.0, 368.0, 125.0, 32.0);
+
+    // 4. Palm trees (2 left, 3 right)
+    draw_palm_tree(&mut buf, W, H, 62.0, 385.0, 44.0, 225.0, 22.0, 68.0, 7.0, 3.0, 122.0, 0.2);
+    draw_palm_tree(&mut buf, W, H, 14.0, 338.0, 74.0, 220.0, 152.0, 124.0, 6.5, 2.8, 110.0, 0.7);
+    draw_palm_tree(&mut buf, W, H, 600.0, 344.0, 588.0, 268.0, 572.0, 195.0, 5.2, 2.2, 76.0, 0.4);
+    draw_palm_tree(&mut buf, W, H, 620.0, 340.0, 636.0, 240.0, 656.0, 148.0, 5.8, 2.4, 92.0, 1.1);
+    draw_palm_tree(&mut buf, W, H, 732.0, 342.0, 736.0, 260.0, 742.0, 185.0, 5.2, 2.2, 80.0, 0.8);
+
+    // 5. Net shadow on sand (perspective quad from (407, 404)..(465, 397) to (407, 600)..(524, 577))
+    for y in 397..H {
+        let yf = y as f32;
+        let x_left = 407.0;
+        let t_right = (yf - 397.0) / 180.0;
+        let x_right = 465.0 + t_right * 59.0;
+        let y_top = 404.0 - 7.0 * ((yf - 404.0) / 58.0).clamp(0.0, 1.0);
+        let y_bot = 600.0 - 23.0 * ((x_right - 407.0) / 117.0);
+        let _ = y_bot;
+        for x in (x_left as usize)..=(x_right.ceil() as usize).min(W - 1) {
+            let u = ((x as f32 - x_left) / (x_right - x_left).max(1.0)).clamp(0.0, 1.0);
+            let y_top_u = 404.0 - 7.0 * u;
+            let y_bot_u = 600.0 - 23.0 * u;
+            if yf < y_top_u || yf > y_bot_u {
+                continue;
+            }
+            let v = (yf - y_top_u) / (y_bot_u - y_top_u).max(1.0);
+            let _ = y_top;
+            let gu = (u * 5.0).fract();
+            let gv = (v * 16.0).fract();
+            let on_vline = gu < 0.045 || gu > 0.955;
+            let on_hline = gv < 0.045 || gv > 0.955;
+            let on_border = u > 0.94 || v < 0.015 || v > 0.965;
+            if on_border {
+                darken_pixel(&mut buf[y * W + x], 0.42);
+            } else if on_vline || on_hline {
+                darken_pixel(&mut buf[y * W + x], 0.68);
+            }
+        }
+    }
+
+    // 6. Center volleyball net pole (x = 393..407, y = 278..600)
+    for y in 278..H {
+        let half_w = if y < 285 {
+            let dy = (285 - y) as f32 / 7.0;
+            7.0 * (1.0 - dy * dy).max(0.0).sqrt()
+        } else {
+            7.0
+        };
+        let x0 = (400.0 - half_w).floor() as usize;
+        let x1 = (400.0 + half_w).ceil() as usize;
+        for x in x0..=x1 {
+            let nx = ((x as f32 - 400.0) / 7.0).clamp(-1.0, 1.0);
+            let shade = 152.0 - nx * 46.0 + (1.0 - (nx + 0.35).abs()).max(0.0) * 40.0;
+            buf[y * W + x] = rgb(shade, shade, shade + 2.0);
+        }
+    }
+
+    // Suppress unused helper warning if blend_pixel is only used in later assets
+    let _ = blend_pixel;
+    buf
+}
