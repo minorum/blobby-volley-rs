@@ -932,27 +932,31 @@ pub fn generate_title_logo() -> Sprite {
                 continue;
             }
 
-            if d > 17.8 {
+            if d > 18.0 {
                 continue;
             }
             let speckle = (hash2(x as i32, y_td(by, H) as i32) - 0.5) * 14.0;
             let bump = (fbm(px * 0.14, py * 0.14, 2) - 0.5) * 28.0;
-            if d <= 4.5 {
-                // Inner bright green letter with dark green outline & speckled highlight
-                let rim = ((4.5 - d) / 1.9).clamp(0.0, 1.0);
-                let hi = ((2.6 - d) / 2.0).clamp(0.0, 1.0) * (speckle.max(0.0) * 1.4);
-                let r = (15.0 + rim * 60.0 + hi + speckle * 0.5).clamp(0.0, 255.0);
-                let g = (105.0 + rim * 135.0 + hi * 0.8 + speckle).clamp(0.0, 255.0);
-                let b = (12.0 + rim * 38.0 + hi * 0.7 + speckle * 0.4).clamp(0.0, 255.0);
-                pixels[by * W + x] = rgb(r, g, b);
-            } else {
-                // Outer blue bumpy bubble
-                let t = ((17.8 - d) / 13.3).clamp(0.0, 1.0);
-                let r = (35.0 + t * 55.0 + bump * 0.6 + speckle * 0.7).clamp(0.0, 255.0);
-                let g = (45.0 + t * 65.0 + bump * 0.7 + speckle * 0.7).clamp(0.0, 255.0);
-                let b = (170.0 + t * 85.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
-                pixels[by * W + x] = rgb(r, g, b);
-            }
+
+            let rim = ((4.5 - d) / 1.9).clamp(0.0, 1.0);
+            let hi = ((2.6 - d) / 2.0).clamp(0.0, 1.0) * (speckle.max(0.0) * 1.4);
+            let gr = (15.0 + rim * 60.0 + hi + speckle * 0.5).clamp(0.0, 255.0);
+            let gg = (105.0 + rim * 135.0 + hi * 0.8 + speckle).clamp(0.0, 255.0);
+            let gb = (12.0 + rim * 38.0 + hi * 0.7 + speckle * 0.4).clamp(0.0, 255.0);
+
+            let t = ((17.8 - d) / 13.3).clamp(0.0, 1.0);
+            let br = (35.0 + t * 55.0 + bump * 0.6 + speckle * 0.7).clamp(0.0, 255.0);
+            let bg = (45.0 + t * 65.0 + bump * 0.7 + speckle * 0.7).clamp(0.0, 255.0);
+            let bb = (170.0 + t * 85.0 + bump * 0.5 + speckle * 0.4).clamp(0.0, 255.0);
+
+            // Smooth teal/cyan transition between inner green letter and outer blue bubble
+            let blend = ((d - 3.9) / 1.2).clamp(0.0, 1.0);
+            // Outer anti-aliased edge falloff into dark-blue/desaturated rim
+            let edge = ((18.0 - d) / 1.2).clamp(0.0, 1.0);
+            let r = (gr * (1.0 - blend) + br * blend) * (0.28 + 0.72 * edge);
+            let g = (gg * (1.0 - blend) + bg * blend) * (0.28 + 0.72 * edge);
+            let b = (gb * (1.0 - blend) + bb * blend) * (0.34 + 0.66 * edge);
+            pixels[by * W + x] = rgb(r, g, b);
         }
     }
     Sprite {
@@ -1109,7 +1113,7 @@ pub fn generate_ending_splash() -> Sprite {
                 0.0
             };
             let grain = (hash2(x as i32, y as i32) - 0.5) * 5.0;
-            let base = 220.0 - sand_edge * 14.0 - palm_hint + weave + grain;
+            let base = 236.0 - sand_edge * 16.0 - palm_hint + weave + grain;
             let r = (base + 1.0).clamp(0.0, 255.0);
             let g = base.clamp(0.0, 255.0);
             let b = (base + 2.0 - sand_edge * 3.0).clamp(0.0, 255.0);
@@ -1122,8 +1126,8 @@ pub fn generate_ending_splash() -> Sprite {
     draw_card_text(&mut pixels, W, H, 94.0, 132.0, 18.0, 24.0, 0.26, "Daniel Skoraszewsky");
     draw_card_text(&mut pixels, W, H, 29.0, 170.0, 18.0, 24.0, 0.26, "Grafik von");
     draw_card_text(&mut pixels, W, H, 102.0, 208.0, 18.0, 24.0, 0.26, "Silvio Mummert");
-    draw_card_text(&mut pixels, W, H, 20.0, 263.0, 13.0, 12.0, 0.04, "www.t-online.de/home/skoraszewsky/");
-    draw_card_text(&mut pixels, W, H, 20.0, 281.0, 13.0, 12.0, 0.04, "www.t-online.de/home/mummertathome/");
+    draw_card_text(&mut pixels, W, H, 24.0, 263.0, 10.5, 11.5, 0.04, "www.t-online.de/home/skoraszewsky/");
+    draw_card_text(&mut pixels, W, H, 24.0, 281.0, 10.5, 11.5, 0.04, "www.t-online.de/home/mummertathome/");
 
     Sprite {
         width: W,

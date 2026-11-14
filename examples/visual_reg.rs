@@ -834,7 +834,7 @@ fn main() {
         m_logo_b.fg_mae, m_logo_b.iou, m_logo_b.boundary_f1
     );
     println!(
-        "  logo ball ROI: fg_MAE={:5.2} (ROI color error); achrom: fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
+        "  logo ball ROI: fg_MAE={:5.2} (ROI RGB error); neutral_in_roi (non-green/non-blue inside ref ball ROI, not full-ball silhouette): fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}",
         m_logo_w.fg_mae, m_logo_wa.fg_mae, m_logo_wa.iou, m_logo_wa.boundary_f1
     );
     println!(
