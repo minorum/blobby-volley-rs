@@ -40,7 +40,11 @@ fn main() {
             fs::write(&ppm_path, ppm).unwrap();
         } else {
             let head: Vec<String> = entry.iter().take(16).map(|b| format!("{b:02X}")).collect();
-            println!("  [{i:02}] NON-BMP ({} bytes): {}", entry.len(), head.join(" "));
+            println!(
+                "  [{i:02}] NON-BMP ({} bytes): {}",
+                entry.len(),
+                head.join(" ")
+            );
         }
     }
 

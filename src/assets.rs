@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::render::Sprite;
 use crate::procedural::{
     generate_background, generate_ball_frames, generate_ball_shadow, generate_blobby_frames,
     generate_blobby_shadows, generate_cursor, generate_ending_splash, generate_font_glyphs,
     generate_hit_wav, generate_title_logo, generate_whistle_wav,
 };
+use crate::render::Sprite;
 
 pub const BLOBBY_COLORS: [u32; 8] = [
     0xFF0000, // 0: Red
@@ -44,62 +44,311 @@ pub struct LocalizedText {
 impl LocalizedText {
     pub fn french() -> Self {
         Self::from_pairs(&[
-            ("@main", &["Jouer", "Jeu en reseau", "Statistiques", "Reglages", "Deutsch", "Fin"]),
-            ("@settings", &["< Joueur 1", "> Joueur 2", "Nom:", "Controle:", "definir Touches ...", "Son:", "Ok", "Clavier", "Souris", "Comp.(facile)", "Comp.(moyen)", "Comp.(difficile)", "marche", "arret"]),
-            ("@keydef", &["Joueur 1 (Host)", "Joueur 2 (invite)", " gauche", " droite", " Saut"]),
+            (
+                "@main",
+                &[
+                    "Jouer",
+                    "Jeu en reseau",
+                    "Statistiques",
+                    "Reglages",
+                    "Deutsch",
+                    "Fin",
+                ],
+            ),
+            (
+                "@settings",
+                &[
+                    "< Joueur 1",
+                    "> Joueur 2",
+                    "Nom:",
+                    "Controle:",
+                    "definir Touches ...",
+                    "Son:",
+                    "Ok",
+                    "Clavier",
+                    "Souris",
+                    "Comp.(facile)",
+                    "Comp.(moyen)",
+                    "Comp.(difficile)",
+                    "marche",
+                    "arret",
+                ],
+            ),
+            (
+                "@keydef",
+                &[
+                    "Joueur 1 (Host)",
+                    "Joueur 2 (invite)",
+                    " gauche",
+                    " droite",
+                    " Saut",
+                ],
+            ),
             ("@win", &["gagne"]),
             ("@nachfrage", &["Vraiment\nquitter\nle jeu?"]),
             ("@names", &["Adam", "Bert", "Carl"]),
-            ("@stats", &["Nom", "Jr.", "ga.", "Points", "²", "³", "Ok", "Jeu contre joueur", "Jeu contre Adam (facile)", "Jeu contre Bert (moyen)", "Jeu contre Carl (difficile)", "Tout les jeux"]),
-            ("@mpsettings", &["Options-Multijoueur", "Jouer reseau...", "Jouer INVITE...", "retour"]),
-            ("@hostsettings", &["Reglages serveur", "Nom du jeu:", "controles:", "jouer!", "retour"]),
-            ("@clientsettings", &["reglages invite", "Host-IP:", "controles:", "Chercher jeux", "retour"]),
-            ("@clientgamelist", &["jeux trouves:", "retour", "pas de jeux trouves"]),
+            (
+                "@stats",
+                &[
+                    "Nom",
+                    "Jr.",
+                    "ga.",
+                    "Points",
+                    "²",
+                    "³",
+                    "Ok",
+                    "Jeu contre joueur",
+                    "Jeu contre Adam (facile)",
+                    "Jeu contre Bert (moyen)",
+                    "Jeu contre Carl (difficile)",
+                    "Tout les jeux",
+                ],
+            ),
+            (
+                "@mpsettings",
+                &[
+                    "Options-Multijoueur",
+                    "Jouer reseau...",
+                    "Jouer INVITE...",
+                    "retour",
+                ],
+            ),
+            (
+                "@hostsettings",
+                &[
+                    "Reglages serveur",
+                    "Nom du jeu:",
+                    "controles:",
+                    "jouer!",
+                    "retour",
+                ],
+            ),
+            (
+                "@clientsettings",
+                &[
+                    "reglages invite",
+                    "Host-IP:",
+                    "controles:",
+                    "Chercher jeux",
+                    "retour",
+                ],
+            ),
+            (
+                "@clientgamelist",
+                &["jeux trouves:", "retour", "pas de jeux trouves"],
+            ),
             ("@hostwaiting", &["attente invite...", "(Annuler avec ESC)"]),
         ])
     }
 
     pub fn german() -> Self {
         Self::from_pairs(&[
-            ("@main", &["Spiel starten", "Netzwerkspiel", "Statistik", "Einstellungen", "English Please", "Ende"]),
-            ("@settings", &["< Spieler 1", "> Spieler 2", "Name:", "Steuerung:", "Tasten definieren...", "Sound:", "Ok", "Tastatur", "Maus", "Comp.(leicht)", "Comp.(mittel)", "Comp.(schwer)", "an", "aus"]),
-            ("@keydef", &["Spieler 1 (Host)", "Spieler 2 (Gast)", " links", " rechts", " Sprung"]),
+            (
+                "@main",
+                &[
+                    "Spiel starten",
+                    "Netzwerkspiel",
+                    "Statistik",
+                    "Einstellungen",
+                    "English Please",
+                    "Ende",
+                ],
+            ),
+            (
+                "@settings",
+                &[
+                    "< Spieler 1",
+                    "> Spieler 2",
+                    "Name:",
+                    "Steuerung:",
+                    "Tasten definieren...",
+                    "Sound:",
+                    "Ok",
+                    "Tastatur",
+                    "Maus",
+                    "Comp.(leicht)",
+                    "Comp.(mittel)",
+                    "Comp.(schwer)",
+                    "an",
+                    "aus",
+                ],
+            ),
+            (
+                "@keydef",
+                &[
+                    "Spieler 1 (Host)",
+                    "Spieler 2 (Gast)",
+                    " links",
+                    " rechts",
+                    " Sprung",
+                ],
+            ),
             ("@win", &["gewinnt"]),
             ("@nachfrage", &["Spiel\nwirklich\nbeenden?"]),
             ("@names", &["Adam", "Bert", "Carl"]),
-            ("@stats", &["Name", "Sp.", "gew.", "Punkte", "²", "³", "Ok", "Spiele gegen Menschen", "Spiele gegen Adam (leicht)", "Spiele gegen Bert (mittel)", "Spiele gegen Carl (schwer)", "alle Spiele"]),
-            ("@mpsettings", &["Multiplayer-Optionen", "Ein Spiel hosten...", "Als Gast spielen...", "zurück"]),
-            ("@hostsettings", &["Host-Einstellungen", "Name des Spiels:", "Steuerung:", "Spiel beginnen!", "Zurück"]),
-            ("@clientsettings", &["Gast-Einstellungen", "Host-IP:", "Steuerung:", "Spiele suchen", "Zurück"]),
-            ("@clientgamelist", &["Gefundene Spiele:", "zurück", "keine Spiele gefunden"]),
-            ("@hostwaiting", &["Warte auf einen Gast...", "(Abbruch mit ESC)"]),
+            (
+                "@stats",
+                &[
+                    "Name",
+                    "Sp.",
+                    "gew.",
+                    "Punkte",
+                    "²",
+                    "³",
+                    "Ok",
+                    "Spiele gegen Menschen",
+                    "Spiele gegen Adam (leicht)",
+                    "Spiele gegen Bert (mittel)",
+                    "Spiele gegen Carl (schwer)",
+                    "alle Spiele",
+                ],
+            ),
+            (
+                "@mpsettings",
+                &[
+                    "Multiplayer-Optionen",
+                    "Ein Spiel hosten...",
+                    "Als Gast spielen...",
+                    "zurück",
+                ],
+            ),
+            (
+                "@hostsettings",
+                &[
+                    "Host-Einstellungen",
+                    "Name des Spiels:",
+                    "Steuerung:",
+                    "Spiel beginnen!",
+                    "Zurück",
+                ],
+            ),
+            (
+                "@clientsettings",
+                &[
+                    "Gast-Einstellungen",
+                    "Host-IP:",
+                    "Steuerung:",
+                    "Spiele suchen",
+                    "Zurück",
+                ],
+            ),
+            (
+                "@clientgamelist",
+                &["Gefundene Spiele:", "zurück", "keine Spiele gefunden"],
+            ),
+            (
+                "@hostwaiting",
+                &["Warte auf einen Gast...", "(Abbruch mit ESC)"],
+            ),
         ])
     }
 
     pub fn english() -> Self {
         Self::from_pairs(&[
-            ("@main", &["Start Game", "Network Match", "Statistics", "Settings", "Francais", "Quit"]),
-            ("@settings", &["< Player 1", "> Player 2", "Name:", "Control:", "Define keys...", "Sound:", "Ok", "Keyboard", "Mouse", "Comp.(easy)", "Comp.(avg.)", "Comp.(hard)", "on", "off"]),
-            ("@keydef", &["Player 1 (host)", "Player 2 (client)", " left", " right", " jump"]),
+            (
+                "@main",
+                &[
+                    "Start Game",
+                    "Network Match",
+                    "Statistics",
+                    "Settings",
+                    "Francais",
+                    "Quit",
+                ],
+            ),
+            (
+                "@settings",
+                &[
+                    "< Player 1",
+                    "> Player 2",
+                    "Name:",
+                    "Control:",
+                    "Define keys...",
+                    "Sound:",
+                    "Ok",
+                    "Keyboard",
+                    "Mouse",
+                    "Comp.(easy)",
+                    "Comp.(avg.)",
+                    "Comp.(hard)",
+                    "on",
+                    "off",
+                ],
+            ),
+            (
+                "@keydef",
+                &[
+                    "Player 1 (host)",
+                    "Player 2 (client)",
+                    " left",
+                    " right",
+                    " jump",
+                ],
+            ),
             ("@win", &["wins"]),
             ("@nachfrage", &["Really quit?"]),
             ("@names", &["Adam", "Bert", "Carl"]),
-            ("@stats", &["name", "gms", "won", "score", "²", "³", "ok", "matches against humans", "matches against Adam (easy)", "matches against Bert (avg.)", "matches against Carl (hard)", "all matches"]),
-            ("@mpsettings", &["Multiplayer Options", "Host a game...", "Join a game...", "Back"]),
-            ("@hostsettings", &["Host Settings", "Game name:", "Control:", "Start Hosting!", "Back"]),
-            ("@clientsettings", &["Client Settings", "Host-IP:", "Control:", "Find Sessions", "Back"]),
-            ("@clientgamelist", &["sessions found:", "back", "no sessions found."]),
-            ("@hostwaiting", &["Waiting for Client... ", "(press ESC to cancel)"]),
+            (
+                "@stats",
+                &[
+                    "name",
+                    "gms",
+                    "won",
+                    "score",
+                    "²",
+                    "³",
+                    "ok",
+                    "matches against humans",
+                    "matches against Adam (easy)",
+                    "matches against Bert (avg.)",
+                    "matches against Carl (hard)",
+                    "all matches",
+                ],
+            ),
+            (
+                "@mpsettings",
+                &[
+                    "Multiplayer Options",
+                    "Host a game...",
+                    "Join a game...",
+                    "Back",
+                ],
+            ),
+            (
+                "@hostsettings",
+                &[
+                    "Host Settings",
+                    "Game name:",
+                    "Control:",
+                    "Start Hosting!",
+                    "Back",
+                ],
+            ),
+            (
+                "@clientsettings",
+                &[
+                    "Client Settings",
+                    "Host-IP:",
+                    "Control:",
+                    "Find Sessions",
+                    "Back",
+                ],
+            ),
+            (
+                "@clientgamelist",
+                &["sessions found:", "back", "no sessions found."],
+            ),
+            (
+                "@hostwaiting",
+                &["Waiting for Client... ", "(press ESC to cancel)"],
+            ),
         ])
     }
 
     fn from_pairs(pairs: &[(&str, &[&str])]) -> Self {
         let mut sections = HashMap::new();
         for &(k, vals) in pairs {
-            sections.insert(
-                k.to_string(),
-                vals.iter().map(|&s| s.to_string()).collect(),
-            );
+            sections.insert(k.to_string(), vals.iter().map(|&s| s.to_string()).collect());
         }
         Self { sections }
     }
@@ -114,8 +363,8 @@ impl LocalizedText {
 }
 
 pub struct GameAssets {
-    pub bg: Vec<u32>,                       // 800x600 top-down (matches Framebuffer)
-    pub bg_dark: Vec<u32>,                  // 800x600 top-down (1/8 brightness for menus)
+    pub bg: Vec<u32>,                     // 800x600 top-down (matches Framebuffer)
+    pub bg_dark: Vec<u32>,                // 800x600 top-down (1/8 brightness for menus)
     pub ball_frames: Vec<Sprite>,         // 16 frames of 64x64
     pub blobby_base: Vec<Sprite>,         // 5 frames of 148x101 (grayscale base)
     pub blobby_colored: [Vec<Sprite>; 2], // 5 frames per player
@@ -126,8 +375,8 @@ pub struct GameAssets {
     pub cursor: Sprite,                   // 48x48
     pub title_logo: Sprite,               // entry 89 (410x230)
     pub ending_splash: Sprite,            // entry 90 (400x300)
-    pub sounds: [Arc<[u8]>; 2],             // 0: whistle, 1: hit/menu click
-    pub texts: [LocalizedText; 3],          // 0: FR, 1: DE, 2: EN
+    pub sounds: [Arc<[u8]>; 2],           // 0: whistle, 1: hit/menu click
+    pub texts: [LocalizedText; 3],        // 0: FR, 1: DE, 2: EN
 }
 
 pub fn find_settings_dir() -> PathBuf {
@@ -269,7 +518,10 @@ mod tests {
         assert_eq!((a.ball_frames[0].width, a.ball_frames[0].height), (64, 64));
         assert_eq!(a.ball_frames, b.ball_frames);
         assert_eq!(a.blobby_base.len(), 5);
-        assert_eq!((a.blobby_base[0].width, a.blobby_base[0].height), (148, 101));
+        assert_eq!(
+            (a.blobby_base[0].width, a.blobby_base[0].height),
+            (148, 101)
+        );
         assert_eq!(a.blobby_shadows.len(), 10);
         assert_eq!((a.ball_shadow.width, a.ball_shadow.height), (69, 17));
         assert_eq!(a.font_glyphs.len(), 55);

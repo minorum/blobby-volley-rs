@@ -70,7 +70,9 @@ pub fn generate_ball_frames() -> Vec<Sprite> {
 
                 let seam = (-(d / 0.06).powi(2)).exp();
                 let cushion = 1.0 + 0.04 * ((d / 0.15).min(1.0) - 0.5);
-                let val = (shade * cushion * (1.0 - 0.17 * seam)).round().clamp(0.0, 255.0) as u32;
+                let val = (shade * cushion * (1.0 - 0.17 * seam))
+                    .round()
+                    .clamp(0.0, 255.0) as u32;
                 if val >= 60 {
                     pixels[by * W + x] = (val << 16) | (val << 8) | val;
                 }
@@ -86,16 +88,7 @@ pub fn generate_ball_frames() -> Vec<Sprite> {
 }
 
 #[inline]
-fn sd_ellipsoid(
-    px: f32,
-    py: f32,
-    pz: f32,
-    cx: f32,
-    cy: f32,
-    rx: f32,
-    ry: f32,
-    rz: f32,
-) -> f32 {
+fn sd_ellipsoid(px: f32, py: f32, pz: f32, cx: f32, cy: f32, rx: f32, ry: f32, rz: f32) -> f32 {
     let qx = (px - cx) / rx;
     let qy = (py - cy) / ry;
     let qz = pz / rz;
@@ -402,15 +395,7 @@ fn draw_palm_tree(
             let leaf_len = (1.0 - (t - 0.35).abs() * 1.1).clamp(0.18, 1.0) * (len * 0.30);
             let shade = if dir_y < 0.0 { 0.95 } else { 0.68 };
 
-            draw_disc(
-                buf,
-                w,
-                h,
-                sx,
-                sy,
-                1.4,
-                rgb(10.0 * shade, 58.0 * shade, 6.0),
-            );
+            draw_disc(buf, w, h, sx, sy, 1.4, rgb(10.0 * shade, 58.0 * shade, 6.0));
 
             // Leaflets on both sides of spine
             let perp_x = -dir_y;
@@ -499,10 +484,16 @@ pub fn generate_background() -> Vec<u32> {
                     0.0
                 };
                 let horiz = if yf < 286.0 { 0.88 } else { 1.0 };
-                let surf = if depth > 0.82 { (depth - 0.82) / 0.18 } else { 0.0 };
+                let surf = if depth > 0.82 {
+                    (depth - 0.82) / 0.18
+                } else {
+                    0.0
+                };
                 let r = (84.0 + depth * 18.0 + surf * 42.0 + (ripple - 0.5) * 30.0 + glint) * horiz;
-                let g = (106.0 + depth * 18.0 + surf * 36.0 + (ripple - 0.5) * 34.0 + glint) * horiz;
-                let b = (244.0 + depth * 4.0 - surf * 48.0 + (ripple - 0.5) * 14.0 + glint * 0.4) * horiz;
+                let g =
+                    (106.0 + depth * 18.0 + surf * 36.0 + (ripple - 0.5) * 34.0 + glint) * horiz;
+                let b = (244.0 + depth * 4.0 - surf * 48.0 + (ripple - 0.5) * 14.0 + glint * 0.4)
+                    * horiz;
                 rgb(r, g, b)
             } else {
                 // Sandy beach with subtle shading and grain
@@ -536,7 +527,11 @@ pub fn generate_background() -> Vec<u32> {
         let y1 = (bot_y.ceil() as usize).min(H);
         for y in y0..y1 {
             let stria = fbm(xf * 0.16, y as f32 * 0.025, 3);
-            let lit = if x > 224 { 0.85 + 0.25 * (241.0 - xf) / 17.0 } else { 0.9 };
+            let lit = if x > 224 {
+                0.85 + 0.25 * (241.0 - xf) / 17.0
+            } else {
+                0.9
+            };
             let cr = (62.0 + stria * 58.0) * lit;
             let cg = (54.0 + stria * 52.0) * lit;
             let cb = (48.0 + stria * 46.0) * lit;
@@ -549,11 +544,21 @@ pub fn generate_background() -> Vec<u32> {
     draw_palm_shadow(&mut buf, W, H, 605.0, 356.0, 120.0, 26.0);
 
     // 4. Palm trees (2 left, 3 right)
-    draw_palm_tree(&mut buf, W, H, 62.0, 385.0, 46.0, 225.0, 32.0, 78.0, 7.0, 3.0, 74.0, 0.2);
-    draw_palm_tree(&mut buf, W, H, 14.0, 338.0, 74.0, 220.0, 150.0, 125.0, 6.5, 2.8, 72.0, 0.7);
-    draw_palm_tree(&mut buf, W, H, 600.0, 344.0, 588.0, 268.0, 582.0, 185.0, 5.2, 2.2, 50.0, 0.4);
-    draw_palm_tree(&mut buf, W, H, 620.0, 340.0, 636.0, 240.0, 655.0, 148.0, 5.8, 2.4, 58.0, 1.1);
-    draw_palm_tree(&mut buf, W, H, 732.0, 342.0, 736.0, 260.0, 742.0, 168.0, 5.2, 2.2, 50.0, 0.8);
+    draw_palm_tree(
+        &mut buf, W, H, 62.0, 385.0, 46.0, 225.0, 32.0, 78.0, 7.0, 3.0, 74.0, 0.2,
+    );
+    draw_palm_tree(
+        &mut buf, W, H, 14.0, 338.0, 74.0, 220.0, 150.0, 125.0, 6.5, 2.8, 72.0, 0.7,
+    );
+    draw_palm_tree(
+        &mut buf, W, H, 600.0, 344.0, 588.0, 268.0, 582.0, 185.0, 5.2, 2.2, 50.0, 0.4,
+    );
+    draw_palm_tree(
+        &mut buf, W, H, 620.0, 340.0, 636.0, 240.0, 655.0, 148.0, 5.8, 2.4, 58.0, 1.1,
+    );
+    draw_palm_tree(
+        &mut buf, W, H, 732.0, 342.0, 736.0, 260.0, 742.0, 168.0, 5.2, 2.2, 50.0, 0.8,
+    );
 
     // 5. Net shadow on sand (perspective quad from (407, 370)..(442, 368) to (407, 600)..(498, 590))
     for y in 368..H {
@@ -734,7 +739,8 @@ pub fn generate_font_glyphs(blobby_base0: &Sprite) -> Vec<Sprite> {
                 let src_y = sy.min(blobby_base0.height - 1);
                 for x in 0..W {
                     let sx = 33 + ((x as f32 + 0.5) / W as f32 * 82.0) as usize;
-                    let p = blobby_base0.pixels[src_y * blobby_base0.width + sx.min(blobby_base0.width - 1)];
+                    let p = blobby_base0.pixels
+                        [src_y * blobby_base0.width + sx.min(blobby_base0.width - 1)];
                     let sum = (p & 0xFF) + ((p >> 8) & 0xFF) + ((p >> 16) & 0xFF);
                     if sum >= 0x28 {
                         pixels[by * W + x] = p;
@@ -869,20 +875,54 @@ fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
     // Letter strokes fitted to the 11 segmented components of graph_89.png (410x230).
     let blobby_strokes: &[&[(f32, f32)]] = &[
         // B
-        &[(21.0, 121.0), (33.0, 59.0), (48.0, 54.0), (58.0, 61.0), (56.0, 76.0), (29.0, 85.0)],
+        &[
+            (21.0, 121.0),
+            (33.0, 59.0),
+            (48.0, 54.0),
+            (58.0, 61.0),
+            (56.0, 76.0),
+            (29.0, 85.0),
+        ],
         &[(58.0, 79.0), (70.0, 96.0), (52.0, 116.0), (19.0, 125.0)],
         // l
         &[(97.0, 43.0), (85.0, 110.0)],
         // o
-        &[(124.0, 58.0), (132.0, 69.0), (126.0, 97.0), (109.0, 106.0), (103.0, 92.0), (111.0, 66.0), (124.0, 58.0)],
+        &[
+            (124.0, 58.0),
+            (132.0, 69.0),
+            (126.0, 97.0),
+            (109.0, 106.0),
+            (103.0, 92.0),
+            (111.0, 66.0),
+            (124.0, 58.0),
+        ],
         // b1
         &[(157.0, 28.0), (140.0, 97.0)],
-        &[(147.0, 74.0), (168.0, 49.0), (178.0, 57.0), (164.0, 79.0), (145.0, 96.0)],
+        &[
+            (147.0, 74.0),
+            (168.0, 49.0),
+            (178.0, 57.0),
+            (164.0, 79.0),
+            (145.0, 96.0),
+        ],
         // b2
         &[(202.0, 17.0), (185.0, 87.0)],
-        &[(190.0, 61.0), (217.0, 37.0), (222.0, 52.0), (204.0, 73.0), (191.0, 85.0)],
+        &[
+            (190.0, 61.0),
+            (217.0, 37.0),
+            (222.0, 52.0),
+            (204.0, 73.0),
+            (191.0, 85.0),
+        ],
         // y
-        &[(236.0, 43.0), (228.0, 80.0), (248.0, 58.0), (262.0, 30.0), (248.0, 89.0), (236.0, 126.0)],
+        &[
+            (236.0, 43.0),
+            (228.0, 80.0),
+            (248.0, 58.0),
+            (262.0, 30.0),
+            (248.0, 89.0),
+            (236.0, 126.0),
+        ],
     ];
     let d1 = dist_to_polylines(px, py, blobby_strokes);
 
@@ -894,9 +934,24 @@ fn title_word_dist(px: f32, py: f32) -> (f32, bool) {
         // l2
         &[(316.0, 105.0), (305.0, 172.0)],
         // e
-        &[(331.0, 150.0), (346.0, 135.0), (343.0, 123.0), (336.0, 126.0), (324.0, 146.0), (326.0, 170.0), (344.0, 156.0)],
+        &[
+            (331.0, 150.0),
+            (346.0, 135.0),
+            (343.0, 123.0),
+            (336.0, 126.0),
+            (324.0, 146.0),
+            (326.0, 170.0),
+            (344.0, 156.0),
+        ],
         // y
-        &[(363.0, 123.0), (355.0, 158.0), (368.0, 151.0), (388.0, 115.0), (373.0, 175.0), (368.0, 194.0)],
+        &[
+            (363.0, 123.0),
+            (355.0, 158.0),
+            (368.0, 151.0),
+            (388.0, 115.0),
+            (373.0, 175.0),
+            (368.0, 194.0),
+        ],
     ];
     let d2 = dist_to_polylines(px, py, volley_strokes);
 
@@ -927,7 +982,10 @@ pub fn generate_title_logo() -> Sprite {
                 let shade = 105.0 + 150.0 * ndotl;
                 let rx = nx * 0.94 - ny * 0.34;
                 let ry = nx * 0.34 + ny * 0.94;
-                let seam_d = (ry.abs() - 0.55).abs().min((rx - 0.18).abs()).min((ry - 0.18).abs());
+                let seam_d = (ry.abs() - 0.55)
+                    .abs()
+                    .min((rx - 0.18).abs())
+                    .min((ry - 0.18).abs());
                 let seam = (-(seam_d / 0.07).powi(2)).exp();
                 let v = (shade * (1.0 - 0.16 * seam)).clamp(40.0, 255.0);
                 pixels[by * W + x] = rgb(v, v, v);
@@ -1042,8 +1100,8 @@ fn draw_arimo_line_into(
     target_w: usize,
     text: &str,
 ) {
-    let font = swash::FontRef::from_index(font_bytes, 0)
-        .expect("embedded Arimo font must be valid");
+    let font =
+        swash::FontRef::from_index(font_bytes, 0).expect("embedded Arimo font must be valid");
     let mut shaper = shape_ctx
         .builder(font)
         .size(px_size)
@@ -1164,7 +1222,11 @@ pub fn generate_ending_splash() -> Sprite {
             let cliff = (1.0 - ((xf - 108.0) / 52.0).clamp(0.0, 1.0)) * 15.0;
             let right_palms = {
                 let mut p = 0.0_f32;
-                for &(px, py, pr) in &[(288.0_f32, 106.0_f32, 34.0_f32), (325.0, 90.0, 38.0), (368.0, 100.0, 34.0)] {
+                for &(px, py, pr) in &[
+                    (288.0_f32, 106.0_f32, 34.0_f32),
+                    (325.0, 90.0, 38.0),
+                    (368.0, 100.0, 34.0),
+                ] {
                     let dx = xf - px;
                     let dy = yf - py;
                     let d = (dx * dx + dy * dy).sqrt();
@@ -1194,12 +1256,52 @@ pub fn generate_ending_splash() -> Sprite {
 
     let lines: &[(&[u8], f32, f32, isize, isize, usize, &str)] = &[
         (ARIMO_ITALIC_TTF, 38.0, 450.0, 13, 13, 216, "Blobby Volley"),
-        (ARIMO_ITALIC_TTF, 30.0, 550.0, 26, 94, 230, "programmiert von"),
-        (ARIMO_ITALIC_TTF, 31.0, 450.0, 93, 131, 279, "Daniel Skoraszewsky"),
+        (
+            ARIMO_ITALIC_TTF,
+            30.0,
+            550.0,
+            26,
+            94,
+            230,
+            "programmiert von",
+        ),
+        (
+            ARIMO_ITALIC_TTF,
+            31.0,
+            450.0,
+            93,
+            131,
+            279,
+            "Daniel Skoraszewsky",
+        ),
         (ARIMO_ITALIC_TTF, 30.0, 450.0, 29, 170, 131, "Grafik von"),
-        (ARIMO_ITALIC_TTF, 31.0, 500.0, 100, 207, 205, "Silvio Mummert"),
-        (ARIMO_REGULAR_TTF, 15.0, 600.0, 23, 263, 334, "www.t-online.de/home/skoraszewsky/"),
-        (ARIMO_REGULAR_TTF, 15.0, 600.0, 23, 282, 360, "www.t-online.de/home/mummertathome/"),
+        (
+            ARIMO_ITALIC_TTF,
+            31.0,
+            500.0,
+            100,
+            207,
+            205,
+            "Silvio Mummert",
+        ),
+        (
+            ARIMO_REGULAR_TTF,
+            15.0,
+            600.0,
+            23,
+            263,
+            334,
+            "www.t-online.de/home/skoraszewsky/",
+        ),
+        (
+            ARIMO_REGULAR_TTF,
+            15.0,
+            600.0,
+            23,
+            282,
+            360,
+            "www.t-online.de/home/mummertathome/",
+        ),
     ];
     for &(font_bytes, px_size, weight, x, y, target_w, text) in lines {
         draw_arimo_line_into(
@@ -1354,12 +1456,13 @@ mod tests {
 
     #[test]
     fn wav_generators_produce_valid_pcm_without_dc_bias() {
-        for (wav, expected_samples) in [(generate_whistle_wav(), 20000), (generate_hit_wav(), 2408)] {
+        for (wav, expected_samples) in [(generate_whistle_wav(), 20000), (generate_hit_wav(), 2408)]
+        {
             assert_eq!(&wav[0..4], b"RIFF");
             assert_eq!(&wav[8..12], b"WAVE");
             assert_eq!(wav.len(), 44 + expected_samples);
-            let mean: f64 = wav[44..].iter().map(|&b| b as f64 - 128.0).sum::<f64>()
-                / expected_samples as f64;
+            let mean: f64 =
+                wav[44..].iter().map(|&b| b as f64 - 128.0).sum::<f64>() / expected_samples as f64;
             assert!(mean.abs() < 2.0, "WAV DC offset too large: {mean}");
         }
     }
@@ -1393,10 +1496,21 @@ mod tests {
             }
         }
         let blank_mean = blank_sum / blank_n as f64;
-        assert!((200.0..=235.0).contains(&blank_mean), "unexpected blank mean {blank_mean}");
+        assert!(
+            (200.0..=235.0).contains(&blank_mean),
+            "unexpected blank mean {blank_mean}"
+        );
 
         // Each of the 7 credit/URL bands must contain dark ink pixels (< 140 luma)
-        for (y0, y1) in [(12, 50), (92, 124), (130, 161), (168, 194), (206, 233), (262, 277), (280, 294)] {
+        for (y0, y1) in [
+            (12, 50),
+            (92, 124),
+            (130, 161),
+            (168, 194),
+            (206, 233),
+            (262, 277),
+            (280, 294),
+        ] {
             let mut dark_cnt = 0usize;
             for y in y0..=y1 {
                 let by = a.height - 1 - y;
@@ -1406,7 +1520,10 @@ mod tests {
                     }
                 }
             }
-            assert!(dark_cnt > 500, "missing text ink in band {y0}..={y1}: {dark_cnt}");
+            assert!(
+                dark_cnt > 500,
+                "missing text ink in band {y0}..={y1}: {dark_cnt}"
+            );
         }
     }
 
@@ -1414,13 +1531,49 @@ mod tests {
     fn embedded_arimo_fonts_parse_and_shape_credit_lines() {
         let mut shape_ctx = swash::shape::ShapeContext::new();
         let credit_lines: &[(&str, &[u8], f32, f32, &str)] = &[
-            ("Arimo Italic", ARIMO_ITALIC_TTF, 38.0, 450.0, "Blobby Volley"),
-            ("Arimo Italic", ARIMO_ITALIC_TTF, 30.0, 550.0, "programmiert von"),
-            ("Arimo Italic", ARIMO_ITALIC_TTF, 31.0, 450.0, "Daniel Skoraszewsky"),
+            (
+                "Arimo Italic",
+                ARIMO_ITALIC_TTF,
+                38.0,
+                450.0,
+                "Blobby Volley",
+            ),
+            (
+                "Arimo Italic",
+                ARIMO_ITALIC_TTF,
+                30.0,
+                550.0,
+                "programmiert von",
+            ),
+            (
+                "Arimo Italic",
+                ARIMO_ITALIC_TTF,
+                31.0,
+                450.0,
+                "Daniel Skoraszewsky",
+            ),
             ("Arimo Italic", ARIMO_ITALIC_TTF, 30.0, 450.0, "Grafik von"),
-            ("Arimo Italic", ARIMO_ITALIC_TTF, 31.0, 500.0, "Silvio Mummert"),
-            ("Arimo Regular", ARIMO_REGULAR_TTF, 15.0, 600.0, "www.t-online.de/home/skoraszewsky/"),
-            ("Arimo Regular", ARIMO_REGULAR_TTF, 15.0, 600.0, "www.t-online.de/home/mummertathome/"),
+            (
+                "Arimo Italic",
+                ARIMO_ITALIC_TTF,
+                31.0,
+                500.0,
+                "Silvio Mummert",
+            ),
+            (
+                "Arimo Regular",
+                ARIMO_REGULAR_TTF,
+                15.0,
+                600.0,
+                "www.t-online.de/home/skoraszewsky/",
+            ),
+            (
+                "Arimo Regular",
+                ARIMO_REGULAR_TTF,
+                15.0,
+                600.0,
+                "www.t-online.de/home/mummertathome/",
+            ),
         ];
         for &(label, bytes, px_size, weight, text) in credit_lines {
             let font = swash::FontRef::from_index(bytes, 0)
@@ -1439,7 +1592,10 @@ mod tests {
                     advance += g.advance;
                 }
             });
-            assert!(glyph_count > 0 && advance > 0.0, "{label} failed to shape '{text}'");
+            assert!(
+                glyph_count > 0 && advance > 0.0,
+                "{label} failed to shape '{text}'"
+            );
         }
     }
 }

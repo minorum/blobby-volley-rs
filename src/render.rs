@@ -160,40 +160,40 @@ impl Framebuffer {
                 let denom = if is_lower { 4 } else { 3 };
                 for row in 0..24i32 {
                     let gy = (row * 3) / denom + line_y;
-                if gy < 0 || gy >= HEIGHT as i32 {
-                    continue;
-                }
-                let sy = HEIGHT - 1 - gy as usize;
-                let col_start = (-cx).max(0);
-                let col_end = (WIDTH as i32 - cx).min(24);
-                for col in col_start..col_end {
-                    let gx = (cx + col) as usize;
-                    let p = glyph.pixels[(row as usize) * 24 + col as usize];
-                    if (p & 0x00E0E0E0) == 0 {
+                    if gy < 0 || gy >= HEIGHT as i32 {
                         continue;
                     }
-                    let out = if !small {
-                        if highlight {
-                            let r = (((p >> 16) & 0xFF) * 2 + 0x1E).min(255);
-                            let g = (((p >> 8) & 0xFF) * 2 + 0x1E).min(255);
-                            let b = ((p & 0xFF) * 2 + 0x1E).min(255);
-                            (r << 16) | (g << 8) | b
-                        } else {
-                            p
+                    let sy = HEIGHT - 1 - gy as usize;
+                    let col_start = (-cx).max(0);
+                    let col_end = (WIDTH as i32 - cx).min(24);
+                    for col in col_start..col_end {
+                        let gx = (cx + col) as usize;
+                        let p = glyph.pixels[(row as usize) * 24 + col as usize];
+                        if (p & 0x00E0E0E0) == 0 {
+                            continue;
                         }
-                    } else {
-                        let b = p & 0xFF;
-                        let g = (p >> 8) & 0xFF;
-                        let r = (p >> 16) & 0xFF;
-                        let lum = ((b * 3 + g * 6 + r) / 10) >> 1;
-                        let base = if highlight { 0xBF } else { 0x7F };
-                        let v = (base - lum as i32).clamp(0, 255) as u32;
-                        (v << 16) | (v << 8) | v
-                    };
-                    self.pixels[sy * WIDTH + gx] = out;
+                        let out = if !small {
+                            if highlight {
+                                let r = (((p >> 16) & 0xFF) * 2 + 0x1E).min(255);
+                                let g = (((p >> 8) & 0xFF) * 2 + 0x1E).min(255);
+                                let b = ((p & 0xFF) * 2 + 0x1E).min(255);
+                                (r << 16) | (g << 8) | b
+                            } else {
+                                p
+                            }
+                        } else {
+                            let b = p & 0xFF;
+                            let g = (p >> 8) & 0xFF;
+                            let r = (p >> 16) & 0xFF;
+                            let lum = ((b * 3 + g * 6 + r) / 10) >> 1;
+                            let base = if highlight { 0xBF } else { 0x7F };
+                            let v = (base - lum as i32).clamp(0, 255) as u32;
+                            (v << 16) | (v << 8) | v
+                        };
+                        self.pixels[sy * WIDTH + gx] = out;
+                    }
                 }
             }
-        }
         }
     }
 

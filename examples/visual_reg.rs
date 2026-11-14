@@ -73,7 +73,11 @@ fn ssim_local_luma(a: &[u32], b: &[u32], w: usize, h: usize) -> f64 {
             count += 1;
         }
     }
-    if count > 0 { sum_ssim / count as f64 } else { 1.0 }
+    if count > 0 {
+        sum_ssim / count as f64
+    } else {
+        1.0
+    }
 }
 
 fn boundary_f1(ref_px: &[u32], proc_px: &[u32], w: usize, h: usize) -> f64 {
@@ -81,7 +85,10 @@ fn boundary_f1(ref_px: &[u32], proc_px: &[u32], w: usize, h: usize) -> f64 {
         if px[y * w + x] == 0 {
             return false;
         }
-        x == 0 || x + 1 == w || y == 0 || y + 1 == h
+        x == 0
+            || x + 1 == w
+            || y == 0
+            || y + 1 == h
             || px[y * w + x - 1] == 0
             || px[y * w + x + 1] == 0
             || px[(y - 1) * w + x] == 0
@@ -129,7 +136,11 @@ fn boundary_f1(ref_px: &[u32], proc_px: &[u32], w: usize, h: usize) -> f64 {
     }
     let rec = tp_r as f64 / r_cnt as f64;
     let prec = tp_p as f64 / p_cnt as f64;
-    if rec + prec > 0.0 { 2.0 * rec * prec / (rec + prec) } else { 0.0 }
+    if rec + prec > 0.0 {
+        2.0 * rec * prec / (rec + prec)
+    } else {
+        0.0
+    }
 }
 
 fn compare_images(ref_px: &[u32], proc_px: &[u32], w: usize, h: usize, has_alpha: bool) -> Metrics {
@@ -176,7 +187,11 @@ fn compare_images(ref_px: &[u32], proc_px: &[u32], w: usize, h: usize, has_alpha
     } else {
         1.0
     };
-    let bf1 = if has_alpha { boundary_f1(ref_px, proc_px, w, h) } else { 1.0 };
+    let bf1 = if has_alpha {
+        boundary_f1(ref_px, proc_px, w, h)
+    } else {
+        1.0
+    };
     let ssim = ssim_local_luma(ref_px, proc_px, w, h);
     Metrics {
         fg_mae_rgb,
@@ -264,14 +279,22 @@ fn build_ref_assets(graph: &[Vec<u8>]) -> GameAssets {
         let mut img = to_sprite(parse_bmp(entry).unwrap());
         for p in &mut img.pixels {
             let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-            *p = if sum < 0x28 { 0 } else { (*p & 0x00FCFCFC) >> 1 };
+            *p = if sum < 0x28 {
+                0
+            } else {
+                (*p & 0x00FCFCFC) >> 1
+            };
         }
         assets.blobby_shadows[k] = img;
     }
     let mut bsh = to_sprite(parse_bmp(&graph[87]).unwrap());
     for p in &mut bsh.pixels {
         let sum = (*p & 0xFF) + ((*p >> 8) & 0xFF) + ((*p >> 16) & 0xFF);
-        *p = if sum < 0x28 { 0 } else { (*p & 0x00FCFCFC) >> 2 };
+        *p = if sum < 0x28 {
+            0
+        } else {
+            (*p & 0x00FCFCFC) >> 2
+        };
     }
     assets.ball_shadow = bsh;
     assets.cursor = to_sprite(parse_bmp(&graph[88]).unwrap());
@@ -334,7 +357,9 @@ fn parse_wav(wav: &[u8]) -> Result<WavData, String> {
     let (audio_fmt, channels, sample_rate, bits_per_sample) =
         fmt.ok_or_else(|| "Missing fmt chunk".to_string())?;
     if audio_fmt != 1 || channels != 1 || bits_per_sample != 8 {
-        return Err(format!("Unsupported WAV format: fmt={audio_fmt} ch={channels} bps={bits_per_sample}"));
+        return Err(format!(
+            "Unsupported WAV format: fmt={audio_fmt} ch={channels} bps={bits_per_sample}"
+        ));
     }
     let raw = data_bytes.ok_or_else(|| "Missing data chunk".to_string())?;
     let samples = raw.iter().map(|&b| b as f64 - 128.0).collect();
@@ -361,10 +386,24 @@ fn pearson_corr(a: &[f64], b: &[f64]) -> f64 {
         va += da * da;
         vb += db * db;
     }
-    if va > 0.0 && vb > 0.0 { num / (va * vb).sqrt() } else { 0.0 }
+    if va > 0.0 && vb > 0.0 {
+        num / (va * vb).sqrt()
+    } else {
+        0.0
+    }
 }
 
-fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
+struct AudioMetrics {
+    ref_len: usize,
+    proc_len: usize,
+    ref_rms: f64,
+    proc_rms: f64,
+    wave_corr: f64,
+    env_corr: f64,
+    band_rel: [f64; 4],
+}
+
+fn evaluate_audio(ref_bytes: &[u8], proc_bytes: &[u8]) -> (AudioMetrics, WavData, WavData, isize) {
     let r = parse_wav(ref_bytes).unwrap();
     let p = parse_wav(proc_bytes).unwrap();
     assert_eq!(r.sample_rate, p.sample_rate);
@@ -372,8 +411,6 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
     assert_eq!(r.bits_per_sample, p.bits_per_sample);
 
     let rms = |s: &[f64]| (s.iter().map(|&x| x * x).sum::<f64>() / s.len() as f64).sqrt();
-    let pk = |s: &[f64]| s.iter().map(|&x| x.abs()).fold(0.0_f64, f64::max);
-    let dc = |s: &[f64]| s.iter().sum::<f64>() / s.len() as f64;
 
     // Search lag over [-64, 64] samples so onset offsets >20 samples are captured,
     // then evaluate waveform, envelope, and STFT on the same aligned slices.
@@ -382,9 +419,15 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
     let mut best_wave_corr = -2.0_f64;
     for lag in -64isize..=64 {
         let (rs, ps) = if lag >= 0 {
-            (&r.samples[lag as usize..n_common], &p.samples[..n_common - lag as usize])
+            (
+                &r.samples[lag as usize..n_common],
+                &p.samples[..n_common - lag as usize],
+            )
         } else {
-            (&r.samples[..n_common - (-lag) as usize], &p.samples[(-lag) as usize..n_common])
+            (
+                &r.samples[..n_common - (-lag) as usize],
+                &p.samples[(-lag) as usize..n_common],
+            )
         };
         let c = pearson_corr(rs, ps);
         if c > best_wave_corr {
@@ -393,9 +436,15 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
         }
     }
     let (r_al, p_al) = if best_lag >= 0 {
-        (&r.samples[best_lag as usize..n_common], &p.samples[..n_common - best_lag as usize])
+        (
+            &r.samples[best_lag as usize..n_common],
+            &p.samples[..n_common - best_lag as usize],
+        )
     } else {
-        (&r.samples[..n_common - (-best_lag) as usize], &p.samples[(-best_lag) as usize..n_common])
+        (
+            &r.samples[..n_common - (-best_lag) as usize],
+            &p.samples[(-best_lag) as usize..n_common],
+        )
     };
     let n_al = r_al.len();
 
@@ -408,7 +457,12 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
     // Windowed time-frequency band relative magnitude error (4 time windows x 4 freq bands)
     let n_wins = 4usize;
     let win_len = (n_al / n_wins).max(64).min(512);
-    let bands = [(0.0, 400.0), (400.0, 1500.0), (1500.0, 4000.0), (4000.0, 12000.0)];
+    let bands = [
+        (0.0, 400.0),
+        (400.0, 1500.0),
+        (1500.0, 4000.0),
+        (4000.0, 12000.0),
+    ];
     let mut band_num = [0.0_f64; 4];
     let mut band_den = [0.0_f64; 4];
     for w_idx in 0..n_wins {
@@ -433,15 +487,35 @@ fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
             band_den[b_idx] += mr;
         }
     }
-    let band_rel: Vec<f64> = (0..4)
-        .map(|i| if band_den[i] > 1e-6 { band_num[i] / band_den[i] } else { 0.0 })
-        .collect();
+    let band_rel = std::array::from_fn(|i| {
+        if band_den[i] > 1e-6 {
+            band_num[i] / band_den[i]
+        } else {
+            0.0
+        }
+    });
 
+    let metrics = AudioMetrics {
+        ref_len: r.samples.len(),
+        proc_len: p.samples.len(),
+        ref_rms: rms(&r.samples),
+        proc_rms: rms(&p.samples),
+        wave_corr: best_wave_corr,
+        env_corr,
+        band_rel,
+    };
+    (metrics, r, p, best_lag)
+}
+
+fn compare_audio(name: &str, ref_bytes: &[u8], proc_bytes: &[u8]) {
+    let (m, r, p, best_lag) = evaluate_audio(ref_bytes, proc_bytes);
+    let pk = |s: &[f64]| s.iter().map(|&x| x.abs()).fold(0.0_f64, f64::max);
+    let dc = |s: &[f64]| s.iter().sum::<f64>() / s.len() as f64;
     println!(
         "{name:15}  ref=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) vs proc=({} smp, {}Hz, rms={:.1}, pk={:.1}, dc={:+.2}) | lag={:+}smp, wave_r={:+.3}, env_r={:.3}, stft_rel_err=[{:.2},{:.2},{:.2},{:.2}]",
-        r.samples.len(), r.sample_rate, rms(&r.samples), pk(&r.samples), dc(&r.samples),
-        p.samples.len(), p.sample_rate, rms(&p.samples), pk(&p.samples), dc(&p.samples),
-        best_lag, best_wave_corr, env_corr, band_rel[0], band_rel[1], band_rel[2], band_rel[3]
+        m.ref_len, r.sample_rate, m.ref_rms, pk(&r.samples), dc(&r.samples),
+        m.proc_len, p.sample_rate, m.proc_rms, pk(&p.samples), dc(&p.samples),
+        best_lag, m.wave_corr, m.env_corr, m.band_rel[0], m.band_rel[1], m.band_rel[2], m.band_rel[3]
     );
 }
 
@@ -472,8 +546,16 @@ mod tests {
         let ref_bg = parse_bmp(&graph[0]).unwrap();
         let proc_bg_bu = flip_td_to_bu(&generate_background(), 800, 600);
         let m_bg = compare_images(&ref_bg.pixels, &proc_bg_bu, 800, 600, false);
-        assert!(m_bg.ssim >= 0.43, "background SSIM regressed: {}", m_bg.ssim);
-        assert!(m_bg.psnr >= 15.5, "background PSNR regressed: {}", m_bg.psnr);
+        assert!(
+            m_bg.ssim >= 0.43,
+            "background SSIM regressed: {}",
+            m_bg.ssim
+        );
+        assert!(
+            m_bg.psnr >= 15.5,
+            "background PSNR regressed: {}",
+            m_bg.psnr
+        );
 
         let mut ref_logo = parse_bmp(&graph[89]).unwrap();
         for p in &mut ref_logo.pixels {
@@ -484,21 +566,71 @@ mod tests {
         }
         let proc_logo = generate_title_logo();
         let m_logo = compare_images(&ref_logo.pixels, &proc_logo.pixels, 410, 230, true);
-        assert!(m_logo.iou >= 0.90, "title logo IoU regressed: {}", m_logo.iou);
-        assert!(m_logo.ssim >= 0.50, "title logo SSIM regressed: {}", m_logo.ssim);
+        assert!(
+            m_logo.iou >= 0.90,
+            "title logo IoU regressed: {}",
+            m_logo.iou
+        );
+        assert!(
+            m_logo.ssim >= 0.50,
+            "title logo SSIM regressed: {}",
+            m_logo.ssim
+        );
 
         let ref_end = parse_bmp(&graph[90]).unwrap();
         let proc_end = generate_ending_splash();
         let m_end = compare_images(&ref_end.pixels, &proc_end.pixels, 400, 300, false);
-        assert!(m_end.ssim >= 0.75, "ending splash SSIM regressed: {}", m_end.ssim);
-        assert!(m_end.psnr >= 18.8, "ending splash PSNR regressed: {}", m_end.psnr);
+        assert!(
+            m_end.ssim >= 0.75,
+            "ending splash SSIM regressed: {}",
+            m_end.ssim
+        );
+        assert!(
+            m_end.psnr >= 18.8,
+            "ending splash PSNR regressed: {}",
+            m_end.psnr
+        );
 
-        let ref_w = parse_wav(&sound[0]).unwrap();
-        let proc_w = parse_wav(&generate_whistle_wav()).unwrap();
-        assert_eq!(ref_w.samples.len(), proc_w.samples.len());
-        let ref_h = parse_wav(&sound[1]).unwrap();
-        let proc_h = parse_wav(&generate_hit_wav()).unwrap();
-        assert_eq!(ref_h.samples.len(), proc_h.samples.len());
+        let (mw, _, _, _) = evaluate_audio(&sound[0], &generate_whistle_wav());
+        assert_eq!(mw.ref_len, mw.proc_len);
+        assert!(
+            mw.wave_corr >= 0.95,
+            "whistle wave_corr regressed: {}",
+            mw.wave_corr
+        );
+        assert!(
+            mw.env_corr >= 0.95,
+            "whistle env_corr regressed: {}",
+            mw.env_corr
+        );
+        assert!(
+            (mw.proc_rms - mw.ref_rms).abs() <= 2.0,
+            "whistle rms regressed: {}",
+            mw.proc_rms
+        );
+        assert!(
+            mw.band_rel[2] <= 0.15,
+            "whistle STFT band[2] regressed: {}",
+            mw.band_rel[2]
+        );
+
+        let (mh, _, _, _) = evaluate_audio(&sound[1], &generate_hit_wav());
+        assert_eq!(mh.ref_len, mh.proc_len);
+        assert!(
+            mh.wave_corr >= 0.75,
+            "hit wave_corr regressed: {}",
+            mh.wave_corr
+        );
+        assert!(
+            mh.env_corr >= 0.95,
+            "hit env_corr regressed: {}",
+            mh.env_corr
+        );
+        assert!(
+            (mh.proc_rms - mh.ref_rms).abs() <= 3.0,
+            "hit rms regressed: {}",
+            mh.proc_rms
+        );
     }
 }
 
@@ -534,11 +666,23 @@ fn main() {
             b_worst_mae = m.fg_mae;
             b_worst_idx = k;
         }
-        save_side_by_side_bu(&out_dir.join(format!("ball_{k:02}.ppm")), 64, 64, &ref_img.pixels, &proc_img.pixels);
+        save_side_by_side_bu(
+            &out_dir.join(format!("ball_{k:02}.ppm")),
+            64,
+            64,
+            &ref_img.pixels,
+            &proc_img.pixels,
+        );
         ball_sheet_ref.extend_from_slice(&ref_img.pixels);
         ball_sheet_proc.extend_from_slice(&proc_img.pixels);
     }
-    save_side_by_side_bu(&out_dir.join("ball_all.ppm"), 64, 16 * 64, &ball_sheet_ref, &ball_sheet_proc);
+    save_side_by_side_bu(
+        &out_dir.join("ball_all.ppm"),
+        64,
+        16 * 64,
+        &ball_sheet_ref,
+        &ball_sheet_proc,
+    );
     println!(
         "Ball (16f):      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4} (worst frame #{b_worst_idx}: fg_MAE={b_worst_mae:.2})",
         b_mae / 16.0,
@@ -571,7 +715,13 @@ fn main() {
         bl_iou += m.iou;
         bl_bf1 += m.boundary_f1;
         bl_ssim += m.ssim;
-        save_side_by_side_bu(&out_dir.join(format!("blobby_{k:02}.ppm")), 148, 101, &ref_img.pixels, &proc_tinted);
+        save_side_by_side_bu(
+            &out_dir.join(format!("blobby_{k:02}.ppm")),
+            148,
+            101,
+            &ref_img.pixels,
+            &proc_tinted,
+        );
     }
     println!(
         "Blobby (5f,red): fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4}",
@@ -609,10 +759,21 @@ fn main() {
     let ref_bg = parse_bmp(&graph[0]).unwrap();
     let proc_bg_bu = flip_td_to_bu(&generate_background(), 800, 600);
     let m_bg = compare_images(&ref_bg.pixels, &proc_bg_bu, 800, 600, false);
-    save_side_by_side_bu(&out_dir.join("bg.ppm"), 800, 600, &ref_bg.pixels, &proc_bg_bu);
+    save_side_by_side_bu(
+        &out_dir.join("bg.ppm"),
+        800,
+        600,
+        &ref_bg.pixels,
+        &proc_bg_bu,
+    );
     println!(
         "Background:      MAE={:5.2} (RGB {:.1}/{:.1}/{:.1}), PSNR={:.2} dB, SSIM={:.4}",
-        m_bg.fg_mae, m_bg.fg_mae_rgb[0], m_bg.fg_mae_rgb[1], m_bg.fg_mae_rgb[2], m_bg.psnr, m_bg.ssim
+        m_bg.fg_mae,
+        m_bg.fg_mae_rgb[0],
+        m_bg.fg_mae_rgb[1],
+        m_bg.fg_mae_rgb[2],
+        m_bg.psnr,
+        m_bg.ssim
     );
 
     // 5. Font (55 glyphs)
@@ -682,9 +843,14 @@ fn main() {
                             0 => rp,
                             1 => pp,
                             _ => {
-                                let dr = (((rp >> 16) & 0xFF) as i32 - ((pp >> 16) & 0xFF) as i32).abs().min(255) as u32;
-                                let dg = (((rp >> 8) & 0xFF) as i32 - ((pp >> 8) & 0xFF) as i32).abs().min(255) as u32;
-                                let db = ((rp & 0xFF) as i32 - (pp & 0xFF) as i32).abs().min(255) as u32;
+                                let dr = (((rp >> 16) & 0xFF) as i32 - ((pp >> 16) & 0xFF) as i32)
+                                    .abs()
+                                    .min(255) as u32;
+                                let dg = (((rp >> 8) & 0xFF) as i32 - ((pp >> 8) & 0xFF) as i32)
+                                    .abs()
+                                    .min(255) as u32;
+                                let db =
+                                    ((rp & 0xFF) as i32 - (pp & 0xFF) as i32).abs().min(255) as u32;
                                 (dr << 16) | (dg << 8) | db
                             }
                         };
@@ -702,7 +868,13 @@ fn main() {
     let ref_cursor = parse_bmp(&graph[88]).unwrap();
     let proc_cursor = generate_cursor();
     let m_cur = compare_images(&ref_cursor.pixels, &proc_cursor.pixels, 48, 48, true);
-    save_side_by_side_bu(&out_dir.join("cursor.ppm"), 48, 48, &ref_cursor.pixels, &proc_cursor.pixels);
+    save_side_by_side_bu(
+        &out_dir.join("cursor.ppm"),
+        48,
+        48,
+        &ref_cursor.pixels,
+        &proc_cursor.pixels,
+    );
     println!(
         "Cursor:          fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4}",
         m_cur.fg_mae, m_cur.iou, m_cur.boundary_f1, m_cur.ssim
@@ -717,18 +889,40 @@ fn main() {
     }
     let proc_logo = generate_title_logo();
     let m_logo = compare_images(&ref_logo.pixels, &proc_logo.pixels, 410, 230, true);
-    save_side_by_side_bu(&out_dir.join("title_logo.ppm"), 410, 230, &ref_logo.pixels, &proc_logo.pixels);
+    save_side_by_side_bu(
+        &out_dir.join("title_logo.ppm"),
+        410,
+        230,
+        &ref_logo.pixels,
+        &proc_logo.pixels,
+    );
     println!(
         "Title logo:      fg_MAE={:5.2}, IoU={:.4}, bF1={:.4}, SSIM={:.4}",
         m_logo.fg_mae, m_logo.iou, m_logo.boundary_f1, m_logo.ssim
     );
     let is_green_core = |p: u32| -> u32 {
-        let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
-        if p != 0 && g > b + 20 && g > r + 10 { p } else { 0 }
+        let (r, g, b) = (
+            ((p >> 16) & 0xFF) as i32,
+            ((p >> 8) & 0xFF) as i32,
+            (p & 0xFF) as i32,
+        );
+        if p != 0 && g > b + 20 && g > r + 10 {
+            p
+        } else {
+            0
+        }
     };
     let is_blue_bubble = |p: u32| -> u32 {
-        let (r, g, b) = (((p >> 16) & 0xFF) as i32, ((p >> 8) & 0xFF) as i32, (p & 0xFF) as i32);
-        if p != 0 && !(g > b + 20 && g > r + 10) && b > r + 20 && b > g + 10 { p } else { 0 }
+        let (r, g, b) = (
+            ((p >> 16) & 0xFF) as i32,
+            ((p >> 8) & 0xFF) as i32,
+            (p & 0xFF) as i32,
+        );
+        if p != 0 && !(g > b + 20 && g > r + 10) && b > r + 20 && b > g + 10 {
+            p
+        } else {
+            0
+        }
     };
     // Derive an encompassing ball ROI directly from the reference logo's neutral volleyball pixels
     // inside the 'o' of "Volley" (x in 215..290, top-down y in 130..200), expanded by +6 px margin.
@@ -773,7 +967,8 @@ fn main() {
                     continue;
                 }
                 let px = x as f32 + 0.5;
-                let in_ball_roi = (px - ref_ball_cx).powi(2) + (py - ref_ball_cy).powi(2) <= ball_roi_r2;
+                let in_ball_roi =
+                    (px - ref_ball_cx).powi(2) + (py - ref_ball_cy).powi(2) <= ball_roi_r2;
                 if in_ball_roi {
                     ball_roi[i] = p;
                     if is_green_core(p) == 0 && is_blue_bubble(p) == 0 {
@@ -790,8 +985,10 @@ fn main() {
         }
         (gr, bl, ball_roi, ball_achrom, other)
     };
-    let (ref_green, ref_blue, ref_ball_seg, ref_ball_achrom, ref_other_seg) = segment_logo(&ref_logo.pixels);
-    let (proc_green, proc_blue, proc_ball_seg, proc_ball_achrom, proc_other_seg) = segment_logo(&proc_logo.pixels);
+    let (ref_green, ref_blue, ref_ball_seg, ref_ball_achrom, ref_other_seg) =
+        segment_logo(&ref_logo.pixels);
+    let (proc_green, proc_blue, proc_ball_seg, proc_ball_achrom, proc_other_seg) =
+        segment_logo(&proc_logo.pixels);
     let m_logo_g = compare_images(&ref_green, &proc_green, 410, 230, true);
     let m_logo_b = compare_images(&ref_blue, &proc_blue, 410, 230, true);
     let m_logo_w = compare_images(&ref_ball_seg, &proc_ball_seg, 410, 230, true);
@@ -914,7 +1111,13 @@ fn main() {
     let ref_end = parse_bmp(&graph[90]).unwrap();
     let proc_end = generate_ending_splash();
     let m_end = compare_images(&ref_end.pixels, &proc_end.pixels, 400, 300, false);
-    save_side_by_side_bu(&out_dir.join("ending_splash.ppm"), 400, 300, &ref_end.pixels, &proc_end.pixels);
+    save_side_by_side_bu(
+        &out_dir.join("ending_splash.ppm"),
+        400,
+        300,
+        &ref_end.pixels,
+        &proc_end.pixels,
+    );
     println!(
         "Ending splash:   MAE={:5.2}, PSNR={:.2} dB, SSIM={:.4}",
         m_end.fg_mae, m_end.psnr, m_end.ssim
@@ -933,7 +1136,13 @@ fn main() {
     let ref_match_bu = flip_td_to_bu(&fb_ref.pixels, WIDTH, HEIGHT);
     let proc_match_bu = flip_td_to_bu(&fb_proc.pixels, WIDTH, HEIGHT);
     let m_match = compare_images(&ref_match_bu, &proc_match_bu, WIDTH, HEIGHT, false);
-    save_side_by_side_bu(&out_dir.join("scene_match.ppm"), WIDTH, HEIGHT, &ref_match_bu, &proc_match_bu);
+    save_side_by_side_bu(
+        &out_dir.join("scene_match.ppm"),
+        WIDTH,
+        HEIGHT,
+        &ref_match_bu,
+        &proc_match_bu,
+    );
     println!(
         "Asset-composited scene (serve): MAE={:5.2}, PSNR={:.2} dB, SSIM={:.4}",
         m_match.fg_mae, m_match.psnr, m_match.ssim
@@ -954,22 +1163,55 @@ fn main() {
 
     fb_ref.copy_bg(&ref_assets.bg_dark);
     fb_ref.draw_title_logo(&ref_assets.title_logo, 0);
-    for (i, label) in ["Start Game", "Network Match", "Statistics", "Settings", "Francais", "Quit"].iter().enumerate() {
+    for (i, label) in [
+        "Start Game",
+        "Network Match",
+        "Statistics",
+        "Settings",
+        "Francais",
+        "Quit",
+    ]
+    .iter()
+    .enumerate()
+    {
         fb_ref.draw_text(&ref_assets, 50, 260 - (i as i32) * 32, false, i == 0, label);
     }
     fb_ref.draw_cursor(&ref_assets.cursor, 200, 250);
 
     fb_proc.copy_bg(&proc_assets.bg_dark);
     fb_proc.draw_title_logo(&proc_assets.title_logo, 0);
-    for (i, label) in ["Start Game", "Network Match", "Statistics", "Settings", "Francais", "Quit"].iter().enumerate() {
-        fb_proc.draw_text(&proc_assets, 50, 260 - (i as i32) * 32, false, i == 0, label);
+    for (i, label) in [
+        "Start Game",
+        "Network Match",
+        "Statistics",
+        "Settings",
+        "Francais",
+        "Quit",
+    ]
+    .iter()
+    .enumerate()
+    {
+        fb_proc.draw_text(
+            &proc_assets,
+            50,
+            260 - (i as i32) * 32,
+            false,
+            i == 0,
+            label,
+        );
     }
     fb_proc.draw_cursor(&proc_assets.cursor, 200, 250);
 
     let ref_menu_bu = flip_td_to_bu(&fb_ref.pixels, WIDTH, HEIGHT);
     let proc_menu_bu = flip_td_to_bu(&fb_proc.pixels, WIDTH, HEIGHT);
     let m_menu = compare_images(&ref_menu_bu, &proc_menu_bu, WIDTH, HEIGHT, false);
-    save_side_by_side_bu(&out_dir.join("scene_menu.ppm"), WIDTH, HEIGHT, &ref_menu_bu, &proc_menu_bu);
+    save_side_by_side_bu(
+        &out_dir.join("scene_menu.ppm"),
+        WIDTH,
+        HEIGHT,
+        &ref_menu_bu,
+        &proc_menu_bu,
+    );
     println!(
         "Asset-composited scene (menu):  MAE={:5.2}, PSNR={:.2} dB, SSIM={:.4}",
         m_menu.fg_mae, m_menu.psnr, m_menu.ssim
