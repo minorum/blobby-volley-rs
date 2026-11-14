@@ -36,13 +36,8 @@ impl Framebuffer {
         }
     }
 
-    pub fn copy_bg(&mut self, bg_bu: &[u32]) {
-        for y in 0..HEIGHT {
-            let src_off = y * WIDTH;
-            let dst_off = (HEIGHT - 1 - y) * WIDTH;
-            self.pixels[dst_off..dst_off + WIDTH]
-                .copy_from_slice(&bg_bu[src_off..src_off + WIDTH]);
-        }
+    pub fn copy_bg(&mut self, bg_top_down: &[u32]) {
+        self.pixels.copy_from_slice(bg_top_down);
     }
 
     pub fn darken_rect_bu(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, shift: u32) {

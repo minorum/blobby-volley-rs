@@ -1,4 +1,5 @@
 use std::io::Cursor;
+use std::sync::Arc;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 
 pub struct SoundEngine {
@@ -23,15 +24,14 @@ impl SoundEngine {
         }
     }
 
-    pub fn play_wav(&self, wav_bytes: &[u8]) {
+    pub fn play_wav(&self, wav_bytes: &Arc<[u8]>) {
         if !self.enabled {
             return;
         }
         let Some(handle) = &self.handle else {
             return;
         };
-        let owned = wav_bytes.to_vec();
-        if let Ok(source) = Decoder::new(Cursor::new(owned)) {
+        if let Ok(source) = Decoder::new(Cursor::new(Arc::clone(wav_bytes))) {
             if let Ok(sink) = Sink::try_new(handle) {
                 sink.append(source);
                 sink.detach();
