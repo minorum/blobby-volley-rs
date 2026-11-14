@@ -695,11 +695,7 @@ impl App {
                     };
                 }
                 2 => {
-                    if let Ok(host) = NetHost::start(
-                        self.settings.host_game_name.clone(),
-                        &self.settings.player_names[0],
-                        self.settings.player_colors[0],
-                    ) {
+                    if let Ok(host) = NetHost::start(self.settings.host_game_name.clone()) {
                         self.net_host = Some(host);
                         self.screen = Screen::HostWaiting;
                         return;
@@ -1026,16 +1022,7 @@ impl App {
                     sound_mask |= 2;
                 }
                 if let Some(host) = &self.net_host {
-                    let r = &m.rally;
-                    host.send_state(
-                        &r.ball,
-                        r.players[0].x, r.players[0].y, r.players[0].anim_frame,
-                        r.players[1].x, r.players[1].y, r.players[1].anim_frame,
-                        [r.players[0].score, r.players[1].score],
-                        r.server,
-                        r.is_first_rally,
-                        sound_mask,
-                    );
+                    host.send_state(&m.rally, sound_mask);
                 }
                 if let Some(winner) = m.winner {
                     let scores = [m.rally.players[0].score, m.rally.players[1].score];
