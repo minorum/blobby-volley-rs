@@ -585,10 +585,11 @@ pub fn generate_background() -> Vec<u32> {
         }
     }
 
-    // 6. Center volleyball net pole (x = 393..407, y = 278..600)
-    for y in 278..H {
-        let half_w = if y < 285 {
-            let dy = (285 - y) as f32 / 7.0;
+    // 6. Center volleyball net pole (x = 393..407, y = 264..600)
+    // Top cap centered at top-down y=271 (bottom-up y=328, matching sim.rs net cap at y=329, r=5).
+    for y in 264..H {
+        let half_w = if y < 271 {
+            let dy = (271 - y) as f32 / 7.0;
             7.0 * (1.0 - dy * dy).max(0.0).sqrt()
         } else {
             7.0

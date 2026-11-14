@@ -139,6 +139,10 @@ pub fn find_settings_dir() -> PathBuf {
     if orig.join("bv_settings.txt").exists() {
         return orig;
     }
+    let manifest_orig = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("original");
+    if manifest_orig.join("bv_settings.txt").exists() {
+        return manifest_orig;
+    }
     cwd
 }
 
