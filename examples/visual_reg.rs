@@ -456,7 +456,7 @@ fn evaluate_audio(ref_bytes: &[u8], proc_bytes: &[u8]) -> (AudioMetrics, WavData
 
     // Windowed time-frequency band relative magnitude error (4 time windows x 4 freq bands)
     let n_wins = 4usize;
-    let win_len = (n_al / n_wins).max(64).min(512);
+    let win_len = (n_al / n_wins).clamp(64, 512);
     let bands = [
         (0.0, 400.0),
         (400.0, 1500.0),
@@ -954,7 +954,8 @@ fn main() {
     // then partition remaining pixels into green lettering, blue bubble, and other edge pixels.
     // Also extract an achromatic/neutral-only ball mask inside the ROI so ball geometry is not
     // conflated with surrounding blue bubble pixels.
-    let segment_logo = |px_buf: &[u32]| -> (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>) {
+    type SegMasks = (Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>);
+    let segment_logo = |px_buf: &[u32]| -> SegMasks {
         let n = px_buf.len();
         let (mut gr, mut bl, mut ball_roi, mut ball_achrom, mut other) =
             (vec![0; n], vec![0; n], vec![0; n], vec![0; n], vec![0; n]);
@@ -1005,7 +1006,7 @@ fn main() {
     }
     // Export side-by-side color-coded mask visualization (ref | proc)
     {
-        let mut m_ppm = format!("P6\n820 230\n255\n").into_bytes();
+        let mut m_ppm = b"P6\n820 230\n255\n".to_vec();
         for by in (0..230usize).rev() {
             for side in 0..2 {
                 let (gr, bl, ba, ot) = if side == 0 {
@@ -1051,7 +1052,7 @@ fn main() {
     };
     let re_logo = logo_edges(&ref_logo.pixels);
     let pe_logo = logo_edges(&proc_logo.pixels);
-    let mut ov_ppm = format!("P6\n410 230\n255\n").into_bytes();
+    let mut ov_ppm = b"P6\n410 230\n255\n".to_vec();
     for y in (0..230).rev() {
         for x in 0..410 {
             let i = y * 410 + x;
@@ -1076,7 +1077,7 @@ fn main() {
     let mut other_tp = 0usize;
     let mut other_fp = 0usize;
     let mut other_fn = 0usize;
-    let mut ot_ppm = format!("P6\n410 230\n255\n").into_bytes();
+    let mut ot_ppm = b"P6\n410 230\n255\n".to_vec();
     for by in (0..230).rev() {
         for x in 0..410 {
             let i = by * 410 + x;
